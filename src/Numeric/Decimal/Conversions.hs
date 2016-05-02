@@ -17,37 +17,49 @@ import Numeric.Decimal.Precision
 import Numeric.Decimal.Rounding
 
 -- | Conversion to numeric string
-toScientificString :: Number p r -> String
-toScientificString num = signStr ++ case num of
+toScientificString :: Number p r -> ShowS
+toScientificString num = signStr . case num of
   Num { coefficient = c, exponent = e }
     | e <= 0 && ae >= -6 -> nonExponential
     | otherwise          -> exponentialNotation cs
-    where cs = show c
-          cl = fromIntegral (length cs)
-          ae = e + cl - 1
-          nonExponential
-            | e == 0    = cs
-            | -e < cl   = let (ca, cb) = splitAt (fromIntegral $ cl + e) cs
-                          in ca ++ '.' : cb
-            | otherwise = '0' : '.' :
-              replicate (fromIntegral $ -e - cl) '0' ++ cs
-          exponentialNotation (d1:ds@(_:_)) = (d1:'.':ds) ++ exponent
-          exponentialNotation     ds        =         ds  ++ exponent
-          exponent = 'E' : aes
-          aes | ae < 0    =       show ae
-              | otherwise = '+' : show ae
-  Inf{} -> "Infinity"
-  QNaN { payload = p } ->  "NaN" ++ diag p
-  SNaN { payload = p } -> "sNaN" ++ diag p
 
-  where signStr :: String
-        signStr = case sign num of
+    where cs = show c                   :: String
+          cl = fromIntegral (length cs) :: Exponent
+          ae = e + cl - 1               :: Exponent
+
+          nonExponential :: ShowS
+          nonExponential
+            | e == 0    = showString cs
+            | -e < cl   = let (ca, cb) = splitAt (fromIntegral $ cl + e) cs
+                          in showString ca . showChar '.' . showString cb
+            | otherwise = showChar '0' . showChar '.' .
+              showString (replicate (fromIntegral $ -e - cl) '0') .
+              showString cs
+
+          exponentialNotation :: String -> ShowS
+          exponentialNotation (d1:ds@(_:_)) = showChar d1 . showChar '.' .
+                                              showString ds . exponent
+          exponentialNotation     ds        = showString ds . exponent
+
+          exponent :: ShowS
+          exponent = showChar 'E' . aes
+
+          aes :: ShowS
+          aes | ae < 0    =                shows ae
+              | otherwise = showChar '+' . shows ae
+
+  Inf  {             } -> showString "Infinity"
+  QNaN { payload = p } -> showString  "NaN" . diag p
+  SNaN { payload = p } -> showString "sNaN" . diag p
+
+  where signStr :: ShowS
+        signStr = showString $ case sign num of
           Pos -> ""
           Neg -> "-"
 
-        diag :: Payload -> String
-        diag 0 = ""
-        diag d = show d
+        diag :: Payload -> ShowS
+        diag 0 = showString ""
+        diag d = shows d
 
 -- | Conversion from numeric string
 toNumber :: (Precision p, Rounding r) => ReadP (Number p r)

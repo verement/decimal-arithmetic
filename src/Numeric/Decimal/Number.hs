@@ -80,10 +80,7 @@ instance Precision p => Precision (Number p r) where
           numberPrecision = undefined
 
 instance Show (Number p r) where
-  showsPrec d = paren . toScientificString
-    where paren :: String -> ShowS
-          paren str@('-':_) = showParen (d > 0) $ showString str
-          paren str         =                     showString str
+  showsPrec d n = showParen (d > 0 && isNegative n) $ toScientificString n
 
 instance (Precision p, Rounding r) => Read (Number p r) where
   readsPrec _ = readP_to_S toNumber

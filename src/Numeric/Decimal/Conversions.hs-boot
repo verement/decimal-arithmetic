@@ -11,5 +11,5 @@ import {-# SOURCE #-} Numeric.Decimal.Number
 import                Numeric.Decimal.Precision (Precision)
 import {-# SOURCE #-} Numeric.Decimal.Rounding (Rounding)
 
-toScientificString :: Number p r -> String
+toScientificString :: Number p r -> ShowS
 toNumber :: (Precision p, Rounding r) => ReadP (Number p r)
