@@ -2,14 +2,22 @@
 module Numeric.Decimal.Number
        ( Sign(..)
        , negateSign
+       , xorSigns
 
        , Coefficient
+       , numDigits
+
        , Exponent
        , Payload
 
        , Number(..)
        , zero
        , one
+       , negativeOne
+       , infinity
+       , qNaN
+       , sNaN
+
        , flipSign
        , cast
        , excessDigits
@@ -35,14 +43,17 @@ import Prelude hiding (exponent, round)
 import Data.Bits (bit, complement, testBit, (.&.), (.|.))
 import Data.Coerce (coerce)
 import Data.Monoid ((<>))
+import Data.Ratio (numerator, denominator, (%))
 import Numeric.Natural (Natural)
 import Text.ParserCombinators.ReadP (readP_to_S)
 
-import {-# SOURCE #-} Numeric.Decimal.Conversions (toScientificString, toNumber)
-import                Numeric.Decimal.Precision (Precision(precision))
-import {-# SOURCE #-} Numeric.Decimal.Rounding (Rounding(round))
+import {-# SOURCE #-} Numeric.Decimal.Conversion
+import                Numeric.Decimal.Precision
+import {-# SOURCE #-} Numeric.Decimal.Rounding
 
-import {-# SOURCE #-} qualified Numeric.Decimal.Operations as Op
+import {-# SOURCE #-} qualified Numeric.Decimal.Operation as Op
+
+import qualified GHC.Real
 
 data Sign = Pos | Neg
           deriving (Eq, Enum, Show)
@@ -51,11 +62,27 @@ negateSign :: Sign -> Sign
 negateSign Pos = Neg
 negateSign Neg = Pos
 
+xorSigns :: Sign -> Sign -> Sign
+xorSigns Pos Pos = Pos
+xorSigns Pos Neg = Neg
+xorSigns Neg Pos = Neg
+xorSigns Neg Neg = Pos
+
+signFactor :: Num a => Sign -> a
+signFactor Pos =  1
+signFactor Neg = -1
+
+signFunc :: Num a => Sign -> a -> a
+signFunc Pos = id
+signFunc Neg = negate
+
 type Coefficient = Natural
 type Exponent = Integer
 
 type Payload = Coefficient
 
+-- | A decimal floating point number with selectable precision and rounding
+-- algorithm
 data Number p r
   = Num  { context     :: Context p r
          , sign        :: Sign
@@ -85,6 +112,56 @@ instance Show (Number p r) where
 instance (Precision p, Rounding r) => Read (Number p r) where
   readsPrec _ = readP_to_S toNumber
 
+instance (Precision p, Rounding r) => Eq (Number p r) where
+  x == y = case x `Op.compare` y of
+    Num { coefficient = 0 } -> True
+    _                       -> False
+
+instance (Precision p, Rounding r) => Ord (Number p r) where
+  x `compare` y = case x `Op.compare` y of
+    Num { coefficient = 0 } -> EQ
+    Num { sign = Neg      } -> LT
+    Num { sign = Pos      } -> GT
+    _                       -> GT  -- match Prelude behavior for NaN
+
+  x < y = case x `Op.compare` y of
+    Num { sign = Neg      } -> True
+    _                       -> False
+
+  x <= y = case x `Op.compare` y of
+    Num { sign = Neg      } -> True
+    Num { coefficient = 0 } -> True
+    _                       -> False
+
+  x > y = case x `Op.compare` y of
+    Num { coefficient = 0 } -> False
+    Num { sign = Pos      } -> True
+    _                       -> False
+
+  x >= y = case x `Op.compare` y of
+    Num { sign = Pos      } -> True
+    _                       -> False
+
+  max nan@SNaN{} _ = nan
+  max _ nan@SNaN{} = nan
+  max nan@QNaN{} _ = nan
+  max _ nan@QNaN{} = nan
+  max x y
+    | x >= y    = x
+    | otherwise = y
+
+  min nan@SNaN{} _ = nan
+  min _ nan@SNaN{} = nan
+  min nan@QNaN{} _ = nan
+  min _ nan@QNaN{} = nan
+  min x y
+    | x < y     = x
+    | otherwise = y
+
+instance (FinitePrecision p, Rounding r) => Enum (Number p r) where
+  toEnum = fromIntegral
+  fromEnum = truncate
+
 instance (Precision p, Rounding r) => Num (Number p r) where
   (+)    = Op.add
   (-)    = Op.subtract
@@ -100,12 +177,33 @@ instance (Precision p, Rounding r) => Num (Number p r) where
 
   fromInteger x = Num { context     = defaultContext
                       , sign        = sx
-                      , coefficient = fromInteger (Prelude.abs x)
+                      , coefficient = fromInteger (abs x)
                       , exponent    = 0
                       }
     where sx = case signum x of
             -1 -> Neg
             _  -> Pos
+
+instance (Precision p, Rounding r) => Real (Number p r) where
+  toRational Num { sign = s, coefficient = c, exponent = e }
+    | e >= 0    = fromInteger (signFactor s * fromIntegral c * 10^e)
+    | otherwise = (signFactor s * fromIntegral c) % 10^(-e)
+  toRational n = signFunc (sign n) $ case n of
+    Inf{} -> GHC.Real.infinity
+    _     -> GHC.Real.notANumber
+
+instance (FinitePrecision p, Rounding r) => Fractional (Number p r) where
+  (/) = Op.divide
+  fromRational r = fromInteger (numerator r) / fromInteger (denominator r)
+
+instance (FinitePrecision p, Rounding r) => RealFrac (Number p r) where
+  properFraction x@Num { sign = s, coefficient = c, exponent = e }
+    | e < 0     = (n, f)
+    | otherwise = (signFactor s * fromIntegral c * 10^e, zero)
+    where n = signFactor s * fromIntegral q
+          f = x { coefficient = r, exponent = -(fromIntegral $ numDigits r) }
+          (q, r) = c `quotRem` (10^(-e))
+  properFraction nan = (0, nan)
 
 -- | A 'Number' representing the value zero
 zero :: Number p r
@@ -119,12 +217,29 @@ zero = Num { context     = defaultContext
 one :: Number p r
 one = zero { coefficient = 1 }
 
+-- | A 'Number' representing the value negative one
+negativeOne :: Number p r
+negativeOne = one { sign = Neg }
+
+-- | A 'Number' representing the value positive infinity
+infinity :: Number p r
+infinity = Inf { context = defaultContext, sign = Pos }
+
+-- | A 'Number' representing undefined results
+qNaN :: Number p r
+qNaN = QNaN { context = defaultContext, sign = Pos, payload = 0 }
+
+-- | A signaling 'Number' representing undefined results
+sNaN :: Number p r
+sNaN = SNaN { context = defaultContext, sign = Pos, payload = 0 }
+
 -- | Negate the given 'Number' by directly flipping its sign.
 flipSign :: Number p r -> Number p r
 flipSign n = n { sign = negateSign (sign n) }
 
--- | Cast a 'Number' to another precision and/or rounding algorithm, rounding
--- immediately with the new algorithm.
+-- | Cast a 'Number' to another precision and/or rounding algorithm,
+-- immediately rounding if necessary to the new precision using the new
+-- algorithm.
 cast :: (Precision p, Rounding r) => Number a b -> Number p r
 cast = round . coerce
 
@@ -198,13 +313,13 @@ eMin n = (1 -) <$> eMax n
 
 -- | Maximum value of the adjusted exponent
 eMax :: Precision p => Number p r -> Maybe Exponent
-eMax n = Prelude.subtract 1 . (10 ^) . numDigits <$> base
+eMax n = subtract 1 . (10 ^) . numDigits <$> base
   where mlength = precision n                    :: Maybe Int
         base = (10 *) . fromIntegral <$> mlength :: Maybe Natural
 
 -- | Minimum value of the exponent for subnormal results
 eTiny :: Precision p => Number p r -> Maybe Exponent
-eTiny n = (-) <$> eMin n <*> (fromIntegral . Prelude.subtract 1 <$> precision n)
+eTiny n = (-) <$> eMin n <*> (fromIntegral . subtract 1 <$> precision n)
 
 -- | Range of permissible exponent values
 eRange :: Precision p => Number p r -> Maybe (Exponent, Exponent)

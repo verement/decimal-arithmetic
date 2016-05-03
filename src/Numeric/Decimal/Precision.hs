@@ -1,6 +1,7 @@
 
 module Numeric.Decimal.Precision
        ( Precision(..)
+       , FinitePrecision
 
        , P1 , P2 , P3 , P4 , P5 , P6 , P7 , P8 , P9 , P10
        , P11, P12, P13, P14, P15, P16, P17, P18, P19, P20
@@ -15,30 +16,47 @@ module Numeric.Decimal.Precision
        , PInfinite
        ) where
 
+-- | Precision indicates the maximum number of significant digits a number may
+-- have.
 class Precision p where
+  -- | Return the precision of the argument, or 'Nothing' if the precision is infinite.
   precision :: p -> Maybe Int
 
+-- | A subclass of precisions which are finite
+class Precision p => FinitePrecision p
+
+-- | A precision of unlimited significant digits
 data PInfinite
 instance Precision PInfinite where
   precision _ = Nothing
 
+-- | A precision of 1 significant digit
 data P1
 instance Precision P1 where
   precision _ = Just 1
+instance FinitePrecision P1
 
+-- | A precision of (@p@ + 1) significant digits
 data PPlus1 p
 instance Precision p => Precision (PPlus1 p) where
   precision pp = (+ 1) <$> precision (minus1 pp)
     where minus1 :: PPlus1 p -> p
           minus1 = undefined
+instance FinitePrecision p => FinitePrecision (PPlus1 p)
 
+-- | A precision of (@p@ × 2) significant digits
 data PTimes2 p
 instance Precision p => Precision (PTimes2 p) where
   precision pp = (* 2) <$> precision (div2 pp)
     where div2 :: PTimes2 p -> p
           div2 = undefined
+instance FinitePrecision p => FinitePrecision (PTimes2 p)
 
+-- | A precision of 2 significant digits
 type P2  = PTimes2 P1 ; type P3  = PPlus1 P2
+-- ^ A precision of 3 significant digits
+
+-- | Et cetera
 type P4  = PTimes2 P2 ; type P5  = PPlus1 P4
 type P6  = PTimes2 P3 ; type P7  = PPlus1 P6
 type P8  = PTimes2 P4 ; type P9  = PPlus1 P8

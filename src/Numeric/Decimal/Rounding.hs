@@ -18,11 +18,67 @@ import Prelude hiding (exponent)
 import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
 
+-- | A rounding algorithm to use when the result of an arithmetic operation
+-- exceeds the precision of the result type
 class Rounding r where
   round :: Precision p => Number p r -> Number p r
 
   isRoundFloor :: Number p r -> Bool
   isRoundFloor _ = False
+
+-- Required...
+
+-- | Round toward 0 (truncate)
+data RoundDown
+instance Rounding RoundDown where
+  round = roundDown
+
+-- | If the discarded digits represent greater than or equal to half (0.5) of
+-- the value of a one in the next left position then the value is rounded
+-- up. If they represent less than half, the value is rounded down.
+data RoundHalfUp
+instance Rounding RoundHalfUp where
+  round = roundHalfUp
+
+-- | If the discarded digits represent greater than half (0.5) of the value of
+-- a one in the next left position then the value is rounded up. If they
+-- represent less than half, the value is rounded down. If they represent
+-- exactly half, the value is rounded to make its rightmost digit even.
+data RoundHalfEven
+instance Rounding RoundHalfEven where
+  round = roundHalfEven
+
+-- | Round toward +∞
+data RoundCeiling
+instance Rounding RoundCeiling where
+  round = roundCeiling
+
+-- | Round toward −∞
+data RoundFloor
+instance Rounding RoundFloor where
+  round = roundFloor
+  isRoundFloor _ = True
+
+-- Optional...
+
+-- | If the discarded digits represent greater than half (0.5) of the value of
+-- a one in the next left position then the value is rounded up. If they
+-- represent less than half or exactly half, the value is rounded down.
+data RoundHalfDown
+instance Rounding RoundHalfDown where
+  round = roundHalfDown
+
+-- | Round away from 0
+data RoundUp
+instance Rounding RoundUp where
+  round = roundUp
+
+-- | Round zero or five away from 0
+data Round05Up
+instance Rounding Round05Up where
+  round = round05Up
+
+-- Implementations
 
 rounded :: (Coefficient -> Coefficient -> Coefficient ->
             Number p r -> Number p r -> Number p r)
@@ -114,40 +170,3 @@ round05Up n = round05Up' (excessDigits n)
           | d == 0 || d == 5 = round05Up up  -- overflow -> roundDown?
           | otherwise        = down
           where d = q `rem` 10
-
--- Required...
-
-data RoundDown
-instance Rounding RoundDown where
-  round = roundDown
-
-data RoundHalfUp
-instance Rounding RoundHalfUp where
-  round = roundHalfUp
-
-data RoundHalfEven
-instance Rounding RoundHalfEven where
-  round = roundHalfEven
-
-data RoundCeiling
-instance Rounding RoundCeiling where
-  round = roundCeiling
-
-data RoundFloor
-instance Rounding RoundFloor where
-  round = roundFloor
-  isRoundFloor _ = True
-
--- Optional...
-
-data RoundHalfDown
-instance Rounding RoundHalfDown where
-  round = roundHalfDown
-
-data RoundUp
-instance Rounding RoundUp where
-  round = roundUp
-
-data Round05Up
-instance Rounding Round05Up where
-  round = round05Up

@@ -1,6 +1,6 @@
 -- -*- Haskell -*-
 
-module Numeric.Decimal.Conversions
+module Numeric.Decimal.Conversion
        ( toScientificString
        , toNumber
        ) where
