@@ -78,25 +78,34 @@ extendedDefaultContext = defaultContext
 
 -- $usage
 --
--- It is recommended that you create an alias for the type of numbers you wish
--- to support in your application. For example:
+-- It is recommended to create an alias for the type of numbers you wish to
+-- support in your application. For example:
 --
 -- >  type Decimal = BasicDecimal
 --
 -- This is a basic number type with 9 decimal digits of precision that rounds
 -- half up.
 --
--- >  type Decimal = ExtendedDecimal P19
+-- >  type Decimal = ExtendedDecimal P15
 --
--- This is a number type with 19 decimal digits of precision that rounds half
--- even.
+-- This is a number type with 15 decimal digits of precision that rounds half
+-- even. There are a range of ready-made precisions available, including 'P1'
+-- through 'P50' on up to 'P2000'. Alternatively, an arbitrary precision can
+-- be constructed through type application of 'PPlus1' and/or 'PTimes2' to any
+-- existing precision.
 --
 -- >  type Decimal = GeneralDecimal
 --
--- This is a number type with infinite precision. (Note that not all
--- operations support numbers with infinite precision.)
+-- This is a number type with infinite precision. Note that not all operations
+-- support numbers with infinite precision.
 --
--- It is also possible to use a decimal number type in a @default@
--- declaration, possibly replacing 'Double' or 'Integer'. For example:
+-- >  type Decimal = Number P34 RoundDown
+--
+-- This is a custom number type with 34 decimal digits of precision that
+-- rounds down (truncates). Several 'Rounding' algorithms are available to
+-- choose from.
+--
+-- A decimal number type may be used in a @default@ declaration, possibly
+-- replacing 'Double' or 'Integer'. For example:
 --
 -- >  default (Integer, Decimal)
