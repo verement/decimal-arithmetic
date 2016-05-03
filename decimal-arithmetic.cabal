@@ -1,6 +1,6 @@
 
 name:                decimal-arithmetic
-version:             0.1.0.0
+version:             0.1.0.1
 
 synopsis:            An implementation of Mike Cowlishaw's
                      General Decimal Arithmetic Specification
@@ -8,7 +8,7 @@ synopsis:            An implementation of Mike Cowlishaw's
 description:         This package provides an implementation of the General
                      Decimal Arithmetic Specification by Mike Cowlishaw.
                      .
-                     For details, see: http://speleotrove.com/decimal/
+                     For details, see <http://speleotrove.com/decimal/>
 
 homepage:            https://github.com/verement/decimal-arithmetic#readme
 bug-reports:         https://github.com/verement/decimal-arithmetic/issues
@@ -20,7 +20,7 @@ copyright:           © 2016 Robert Leslie
 author:              Rob Leslie <rob@mars.org>
 maintainer:          Rob Leslie <rob@mars.org>
 
-stability:           alpha
+stability:           experimental
 category:            Numeric
 
 build-type:          Simple
