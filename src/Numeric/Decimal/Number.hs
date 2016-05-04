@@ -41,6 +41,7 @@ module Numeric.Decimal.Number
 import Prelude hiding (exponent, round)
 
 import Data.Bits (bit, complement, testBit, (.&.), (.|.))
+import Data.Char (isSpace)
 import Data.Coerce (coerce)
 import Data.Monoid ((<>))
 import Data.Ratio (numerator, denominator, (%))
@@ -110,7 +111,7 @@ instance Show (Number p r) where
   showsPrec d n = showParen (d > 0 && isNegative n) $ toScientificString n
 
 instance (Precision p, Rounding r) => Read (Number p r) where
-  readsPrec _ = readP_to_S toNumber
+  readsPrec _ = readParen False $ readP_to_S toNumber . dropWhile isSpace
 
 instance (Precision p, Rounding r) => Eq (Number p r) where
   x == y = case x `Op.compare` y of
@@ -401,13 +402,52 @@ raiseSignal sig n = let n' = modifyContext (setSignal sig) n
                     in trapHandler (context n') sig n'
 
 {- $doctest
-
 prop> x + x == x * (2 :: Decimal)
 prop> isFinite x ==> x - x == (0 :: Decimal)
+-}
+
+{- $doctest-read
+prop> rep (read "0")         == N (0,0,0)
+prop> rep (read "0.00")      == N (0,0,-2)
+prop> rep (read "123")       == N (0,123,0)
+prop> rep (read "-123")      == N (1,123,0)
+prop> rep (read "1.23E3")    == N (0,123,1)
+prop> rep (read "1.23E+3")   == N (0,123,1)
+prop> rep (read "12.3E+7")   == N (0,123,6)
+prop> rep (read "12.0")      == N (0,120,-1)
+prop> rep (read "12.3")      == N (0,123,-1)
+prop> rep (read "0.00123")   == N (0,123,-5)
+prop> rep (read "-1.23E-12") == N (1,123,-14)
+prop> rep (read "1234.5E-4") == N (0,12345,-5)
+prop> rep (read "-0")        == N (1,0,0)
+prop> rep (read "-0.00")     == N (1,0,-2)
+prop> rep (read "0E+7")      == N (0,0,7)
+prop> rep (read "-0E-7")     == N (1,0,-7)
+prop> rep (read "inf")       == I (0)
+prop> rep (read "+inFiniTy") == I (0)
+prop> rep (read "-Infinity") == I (1)
+prop> rep (read "NaN")       == Q (0)
+prop> rep (read "-NAN")      == Q (1)
+prop> rep (read "SNaN")      == S (0)
+xxxx> rep (read "Fred")      == Q (0)
+
+prop> fmap rep (read "Just 123")     == Just (N (0,123,0))
+prop> fmap rep (read "Just (-12.0)") == Just (N (1,120,-1))
 -}
 
 {- $setup
 >>> :load test/Arbitrary.hs
 >>> import Numeric.Decimal.Number
+>>> import qualified Numeric.Decimal.Number as N
+
 >>> type Decimal = BasicDecimal
+
+>>> data Rep = N (Int, Coefficient, Exponent) | I Int | Q Int | S Int deriving Eq
+>>> :{
+    let rep n = case n :: Decimal of
+            Num  { sign = s, coefficient = c, N.exponent = e } -> N (fromEnum s, c, e)
+            Inf  { sign = s } -> I (fromEnum s)
+            QNaN { sign = s } -> Q (fromEnum s)
+            SNaN { sign = s } -> S (fromEnum s)
+:}
 -}

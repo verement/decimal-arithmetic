@@ -210,7 +210,8 @@ toNumber = round <$> (parseSign flipSign <*> parseNumericString)
 -- of numbers, or which might result from conversion from the abstract
 -- representation to a string, are called /numeric strings/.
 --
--- A /numeric string/ is a character string that describes either a /finite number/ or a /special value/.
+-- A /numeric string/ is a character string that describes either a
+-- /finite number/ or a /special value/.
 --
 -- *   If it describes a /finite number/, it includes one or more decimal
 --     digits, with an optional decimal point. The decimal point may be embedded
@@ -254,4 +255,25 @@ toNumber = round <$> (parseSign flipSign <*> parseNumericString)
 --
 -- 1. A single period alone or with a sign is not a valid numeric string.
 -- 2. A sign alone is not a valid numeric string.
--- 3. Significant (after the decimal point) and insignificant leading zeros are permitted.
+-- 3. Significant (after the decimal point) and insignificant leading zeros
+--    are permitted.
+
+{- $doctest
+prop> read' toNumber (show' toScientificString  x) == (x :: Decimal)
+prop> read' toNumber (show' toEngineeringString x) == (x :: Decimal)
+-}
+
+{- $setup
+>>> :load test/Arbitrary.hs
+>>> import Numeric.Decimal
+>>> import Numeric.Decimal.Conversion
+>>> import Text.ParserCombinators.ReadP
+
+>>> type Decimal = BasicDecimal
+
+>>> let show' s = ($ "") . s
+>>> :{
+    let read' p str = case [ x | (x, "") <- readP_to_S p str ] of {
+      [x] -> x; _ -> error "read failed" }
+    :}
+-}
