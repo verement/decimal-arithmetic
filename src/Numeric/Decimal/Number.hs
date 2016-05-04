@@ -399,3 +399,15 @@ testSignal (Signals ss) = testBit ss . fromEnum
 raiseSignal :: Signal -> Number p r -> Number p r
 raiseSignal sig n = let n' = modifyContext (setSignal sig) n
                     in trapHandler (context n') sig n'
+
+{- $doctest
+
+prop> x + x == x * (2 :: Decimal)
+prop> isFinite x ==> x - x == (0 :: Decimal)
+-}
+
+{- $setup
+>>> :load test/Arbitrary.hs
+>>> import Numeric.Decimal.Number
+>>> type Decimal = BasicDecimal
+-}

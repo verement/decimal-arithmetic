@@ -1,9 +1,10 @@
 
+module Numeric.Decimal.Arbitrary
+       ( Arbitrary
+       ) where
+
 import Numeric.Decimal
 import Test.QuickCheck
-
-main :: IO ()
-main = putStrLn "Test suite not yet implemented"
 
 infinity :: (Precision p, Rounding r) => Number p r
 infinity = read "Infinity"
