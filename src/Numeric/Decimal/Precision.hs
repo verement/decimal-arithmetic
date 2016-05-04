@@ -22,7 +22,7 @@ class Precision p where
   -- | Return the precision of the argument, or 'Nothing' if the precision is infinite.
   precision :: p -> Maybe Int
 
--- | A subclass of precisions which are finite
+-- | A subclass of precisions that are finite
 class Precision p => FinitePrecision p
 
 -- | A precision of unlimited significant digits
