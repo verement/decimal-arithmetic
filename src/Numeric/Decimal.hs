@@ -57,55 +57,53 @@ import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
 import Numeric.Decimal.Rounding
 
--- | A basic decimal floating point number with 9 digits of precision, rounding half up
+-- | A decimal floating point number with 9 digits of precision, rounding half
+-- up
 type BasicDecimal = Number P9 RoundHalfUp
 
--- | A decimal floating point number with selectable precision, rounding half even
-type ExtendedDecimal p = Number p  RoundHalfEven
+-- | A decimal floating point number with selectable precision, rounding half
+-- even
+type ExtendedDecimal p = Number p RoundHalfEven
 
 -- | A decimal floating point number with infinite precision
 type GeneralDecimal = ExtendedDecimal PInfinite
 
-basicDefaultContext :: TrapHandler P9 RoundHalfUp -> Context P9 RoundHalfUp
-basicDefaultContext handler = defaultContext { trapHandler = trap }
-  where trap Inexact   = id
-        trap Rounded   = id
-        trap Subnormal = id
-        trap sig       = handler sig
+{- $usage
 
-extendedDefaultContext :: Context p RoundHalfEven
-extendedDefaultContext = defaultContext
+You should choose a decimal number type with appropriate precision and
+rounding to use in your application. There are several options:
 
--- $usage
---
--- It is recommended to create an alias for the type of numbers you wish to
--- support in your application. For example:
---
--- >  type Decimal = BasicDecimal
---
--- This is a basic number type with 9 decimal digits of precision that rounds
--- half up.
---
--- >  type Decimal = ExtendedDecimal P15
---
--- This is a number type with 15 decimal digits of precision that rounds half
--- even. There are a range of ready-made precisions available, including 'P1'
--- through 'P50' on up to 'P2000'. Alternatively, an arbitrary precision can
--- be constructed through type application of 'PPlus1' and/or 'PTimes2' to any
--- existing precision.
---
--- >  type Decimal = GeneralDecimal
---
--- This is a number type with infinite precision. Note that not all operations
--- support numbers with infinite precision.
---
--- >  type Decimal = Number P34 RoundDown
---
--- This is a custom number type with 34 decimal digits of precision that
--- rounds down (truncates). Several 'Rounding' algorithms are available to
--- choose from.
---
--- A decimal number type may be used in a @default@ declaration, possibly
--- replacing 'Double' or 'Integer'. For example:
---
--- >  default (Integer, Decimal)
+* 'BasicDecimal' is a number type with 9 decimal digits of precision that
+rounds half up.
+
+* 'ExtendedDecimal' is a number type with selectable precision that rounds
+half even. For example, 'ExtendedDecimal' 'P34' is a number type with 34
+decimal digits of precision. There are a range of ready-made precisions
+available, including 'P1' through 'P50' on up to 'P2000'.  Alternatively, an
+arbitrary precision can be constructed through type application of 'PPlus1'
+and/or 'PTimes2' to any existing precision.
+
+* 'GeneralDecimal' is a number type with infinite precision. Note that not all
+operations support numbers with infinite precision.
+
+* The most versatile 'Number' type is parameterized by both a precision and a
+rounding algorithm. For example, 'Number' 'P20' 'RoundDown' is a number type
+with 20 decimal digits of precision that rounds down (truncates). Several
+'Rounding' algorithms are available to choose from.
+
+It is suggested to create an alias for the type of numbers you wish to support
+in your application. For example:
+
+> type Decimal = ExtendedDecimal P16
+
+A decimal number type may be used in a @default@ declaration, possibly
+replacing 'Double' or 'Integer'. For example:
+
+> default (Integer, BasicDecimal)
+
+== Advanced usage
+
+Additional operations and control beyond what is provided by the basic numeric
+type classes are available through the use of "Numeric.Decimal.Arithmetic" and
+"Numeric.Decimal.Operation".
+-}

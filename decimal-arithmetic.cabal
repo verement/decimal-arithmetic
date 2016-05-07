@@ -39,15 +39,19 @@ library
 
   exposed-modules:     Numeric.Decimal
                        Numeric.Decimal.Conversion
+                       Numeric.Decimal.Arithmetic
                        Numeric.Decimal.Operation
   other-modules:       Numeric.Decimal.Number
                        Numeric.Decimal.Precision
                        Numeric.Decimal.Rounding
 
   build-depends:       base >= 4.7 && < 5
+                     , mtl
   default-language:    Haskell2010
   default-extensions:  Trustworthy
-  other-extensions:    RoleAnnotations
+  other-extensions:    FlexibleInstances
+                       MultiParamTypeClasses
+                       RoleAnnotations
 
 test-suite doctests
   type:                exitcode-stdio-1.0

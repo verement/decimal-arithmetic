@@ -1,5 +1,5 @@
 
-module Numeric.Decimal.Arbitrary
+module Arbitrary
        ( Arbitrary
        ) where
 

@@ -16,8 +16,8 @@ module Numeric.Decimal.Precision
        , PInfinite
        ) where
 
--- | Precision indicates the maximum number of significant digits a number may
--- have.
+-- | Precision indicates the maximum number of significant decimal digits a
+-- number may have.
 class Precision p where
   -- | Return the precision of the argument, or 'Nothing' if the precision is infinite.
   precision :: p -> Maybe Int

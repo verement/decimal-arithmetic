@@ -1,6 +1,4 @@
 
-import Numeric.Decimal
 import Test.DocTest
-import Test.QuickCheck
 
-main = doctest ["-isrc", "src/Numeric/Decimal.hs"]
+main = doctest ["-isrc:test", "src/Numeric/Decimal.hs"]

@@ -20,7 +20,6 @@ module Numeric.Decimal.Number
 
        , flipSign
        , cast
-       , excessDigits
 
        , isPositive
        , isNegative
@@ -28,33 +27,28 @@ module Numeric.Decimal.Number
        , isZero
        , isNormal
        , isSubnormal
-
-       , Context(..)
-       , TrapHandler
-       , defaultContext
-       , mergeContexts
-
-       , Signal(..)
-       , raiseSignal
        ) where
 
 import Prelude hiding (exponent, round)
 
-import Data.Bits (bit, complement, testBit, (.&.), (.|.))
 import Data.Char (isSpace)
 import Data.Coerce (coerce)
-import Data.Monoid ((<>))
 import Data.Ratio (numerator, denominator, (%))
 import Numeric.Natural (Natural)
 import Text.ParserCombinators.ReadP (readP_to_S)
 
 import {-# SOURCE #-} Numeric.Decimal.Conversion
+import {-# SOURCE #-} Numeric.Decimal.Arithmetic
 import                Numeric.Decimal.Precision
-import {-# SOURCE #-} Numeric.Decimal.Rounding
+import                Numeric.Decimal.Rounding
 
 import {-# SOURCE #-} qualified Numeric.Decimal.Operation as Op
 
 import qualified GHC.Real
+
+{- $setup
+>>> :load Harness
+-}
 
 data Sign = Pos | Neg
           deriving (Eq, Enum, Show)
@@ -69,77 +63,88 @@ xorSigns Pos Neg = Neg
 xorSigns Neg Pos = Neg
 xorSigns Neg Neg = Pos
 
-signFactor :: Num a => Sign -> a
-signFactor Pos =  1
-signFactor Neg = -1
-
 signFunc :: Num a => Sign -> a -> a
 signFunc Pos = id
 signFunc Neg = negate
 
-type Coefficient = Natural
-type Exponent = Integer
+signMatch :: (Num a, Eq a) => a -> Sign
+signMatch x = case signum x of
+  -1 -> Neg
+  _  -> Pos
 
-type Payload = Coefficient
+type Coefficient = Natural
+type Exponent    = Int
+type Payload     = Coefficient
 
 -- | A decimal floating point number with selectable precision and rounding
 -- algorithm
 data Number p r
-  = Num  { context     :: Context p r
-         , sign        :: Sign
+  = Num  { sign        :: Sign
          , coefficient :: Coefficient
          , exponent    :: Exponent
          }
-  | Inf  { context     :: Context p r
-         , sign        :: Sign
+  | Inf  { sign        :: Sign
          }
-  | QNaN { context     :: Context p r
-         , sign        :: Sign
+  | QNaN { sign        :: Sign
          , payload     :: Payload
          }
-  | SNaN { context     :: Context p r
-         , sign        :: Sign
+  | SNaN { sign        :: Sign
          , payload     :: Payload
          }
+
+instance Show (Number p r) where
+  showsPrec d n = showParen (d > 0 && isNegative n) $ toScientificString n
+
+instance (Precision p, Rounding r) => Read (Number p r) where
+  readsPrec _ str = [ (cast n, s)
+                    | (n, s) <- readParen False
+                      (readP_to_S toNumber . dropWhile isSpace) str ]
+
+{- $doctest-Read
+>>> fmap toRep (read "Just 123" :: Maybe GeneralDecimal)
+Just (N (0,123,0))
+
+>>> fmap toRep (read "Just (-12.0)" :: Maybe GeneralDecimal)
+Just (N (1,120,-1))
+-}
 
 instance Precision p => Precision (Number p r) where
   precision = precision . numberPrecision
     where numberPrecision :: Number p r -> p
           numberPrecision = undefined
 
-instance Show (Number p r) where
-  showsPrec d n = showParen (d > 0 && isNegative n) $ toScientificString n
+numberOp :: (Precision p, Rounding r) => Arith p r (Number p r) -> Number p r
+numberOp op = either exceptionResult id $ evalArith op newContext
 
-instance (Precision p, Rounding r) => Read (Number p r) where
-  readsPrec _ = readParen False $ readP_to_S toNumber . dropWhile isSpace
+type GeneralNumber = Number PInfinite RoundDown
 
-instance (Precision p, Rounding r) => Eq (Number p r) where
-  x == y = case x `Op.compare` y of
+instance Eq (Number p r) where
+  x == y = case numberOp (x `Op.compare` y) :: GeneralNumber of
     Num { coefficient = 0 } -> True
     _                       -> False
 
-instance (Precision p, Rounding r) => Ord (Number p r) where
-  x `compare` y = case x `Op.compare` y of
+instance Ord (Number p r) where
+  x `compare` y = case numberOp (x `Op.compare` y) :: GeneralNumber of
     Num { coefficient = 0 } -> EQ
     Num { sign = Neg      } -> LT
     Num { sign = Pos      } -> GT
     _                       -> GT  -- match Prelude behavior for NaN
 
-  x < y = case x `Op.compare` y of
+  x < y = case numberOp (x `Op.compare` y) :: GeneralNumber of
     Num { sign = Neg      } -> True
     _                       -> False
 
-  x <= y = case x `Op.compare` y of
+  x <= y = case numberOp (x `Op.compare` y) :: GeneralNumber of
     Num { sign = Neg      } -> True
     Num { coefficient = 0 } -> True
     _                       -> False
 
-  x > y = case x `Op.compare` y of
+  x > y = case numberOp (x `Op.compare` y) :: GeneralNumber of
     Num { coefficient = 0 } -> False
     Num { sign = Pos      } -> True
     _                       -> False
 
-  x >= y = case x `Op.compare` y of
+  x >= y = case numberOp (x `Op.compare` y) :: GeneralNumber of
     Num { sign = Pos      } -> True
     _                       -> False
 
@@ -159,16 +164,37 @@ instance (Precision p, Rounding r) => Ord (Number p r) where
     | x < y     = x
     | otherwise = y
 
-instance (FinitePrecision p, Rounding r) => Enum (Number p r) where
+instance (Precision p, Rounding r) => Enum (Number p r) where
+  succ x = numberOp (x `Op.add`      one)
+  pred x = numberOp (x `Op.subtract` one)
+
   toEnum = fromIntegral
-  fromEnum = truncate
+
+  fromEnum Num { sign = s, coefficient = c, exponent = e }
+    | e >= 0    = signFunc s (fromIntegral   c  *      10^  e  )
+    | otherwise = signFunc s (fromIntegral $ c `quot` (10^(-e)))
+  fromEnum _ = 0
+
+  enumFrom       x     = enumFromWith x one
+  enumFromThen   x y   = let i = y - x
+                         in x : y : enumFromWith (y + i) i
+  enumFromTo     x   e = takeWhile (<= e) $ enumFromWith x one
+  enumFromThenTo x y e = let i = y - x
+                             cmp | i < 0     = (>=)
+                                 | otherwise = (<=)
+                         in takeWhile (`cmp` e) $ x : y : enumFromWith (y + i) i
+
+enumFromWith :: (Precision p, Rounding r)
+             => Number p r -> Number p r -> [Number p r]
+enumFromWith x i = x : enumFromWith (x + i) i
 
 instance (Precision p, Rounding r) => Num (Number p r) where
-  (+)    = Op.add
-  (-)    = Op.subtract
-  (*)    = Op.multiply
-  negate = Op.minus
-  abs    = Op.abs
+  x + y = numberOp (x `Op.add`      y)
+  x - y = numberOp (x `Op.subtract` y)
+  x * y = numberOp (x `Op.multiply` y)
+
+  negate = numberOp . Op.minus
+  abs    = numberOp . Op.abs
 
   signum n = case n of
     Num { coefficient = 0 } -> zero
@@ -176,47 +202,163 @@ instance (Precision p, Rounding r) => Num (Number p r) where
     Inf { sign = s        } -> one { sign = s }
     _                       -> n
 
-  fromInteger x = Num { context     = defaultContext
-                      , sign        = sx
-                      , coefficient = fromInteger (abs x)
-                      , exponent    = 0
-                      }
-    where sx = case signum x of
-            -1 -> Neg
-            _  -> Pos
+  fromInteger x = cast
+    Num { sign        = signMatch x
+        , coefficient = fromInteger (abs x)
+        , exponent    = 0
+        }
+
+{- $doctest-Num
+prop> x + x == x * (2 :: GeneralDecimal)
+prop> isFinite x ==> x - x == (0 :: GeneralDecimal)
+prop> isFinite x ==> x + negate x == (0 :: GeneralDecimal)
+prop> abs x >= (0 :: GeneralDecimal)
+
+prop> abs x * signum x == (x :: GeneralDecimal)
+-}
 
 instance (Precision p, Rounding r) => Real (Number p r) where
   toRational Num { sign = s, coefficient = c, exponent = e }
-    | e >= 0    = fromInteger (signFactor s * fromIntegral c * 10^e)
-    | otherwise = (signFactor s * fromIntegral c) % 10^(-e)
+    | e >= 0    = fromInteger $ signFunc s (fromIntegral c * 10^e)
+    | otherwise = signFunc s (fromIntegral c) % 10^(-e)
   toRational n = signFunc (sign n) $ case n of
     Inf{} -> GHC.Real.infinity
     _     -> GHC.Real.notANumber
 
 instance (FinitePrecision p, Rounding r) => Fractional (Number p r) where
-  (/) = Op.divide
+  x / y = numberOp (x `Op.divide` y)
   fromRational r = fromInteger (numerator r) / fromInteger (denominator r)
 
 instance (FinitePrecision p, Rounding r) => RealFrac (Number p r) where
   properFraction x@Num { sign = s, coefficient = c, exponent = e }
     | e < 0     = (n, f)
-    | otherwise = (signFactor s * fromIntegral c * 10^e, zero)
-    where n = signFactor s * fromIntegral q
+    | otherwise = (signFunc s (fromIntegral c * 10^e), zero)
+    where n = signFunc s (fromIntegral q)
           f = x { coefficient = r, exponent = -(fromIntegral $ numDigits r) }
           (q, r) = c `quotRem` (10^(-e))
   properFraction nan = (0, nan)
 
+-- | Compute an infinite series to maximum precision.
+infiniteSeries :: (FinitePrecision p, Rounding r) => [Number p r] -> Number p r
+infiniteSeries = series zero
+  where series n (x:xs)
+          | n' == n   = n'
+          | otherwise = series n' xs
+          where n' = n + x
+        series n []   = n
+
+-- | Compute the arcsine of the argument to maximum precision using series
+-- expansion.
+arcsine :: (FinitePrecision p, Rounding r) => Number p r -> Number p r
+arcsine x = infiniteSeries (x : series 1 2 x 3)
+  where series n d x i =
+          let x' = x * x2
+          in (n * x') / (d * i) : series (n * i) (d * (i + one)) x' (i + two)
+        x2 = x * x
+
+-- | Compute π to maximum precision using the arcsine series expansion.
+seriesPi :: FinitePrecision p => Number p RoundHalfEven
+seriesPi = 6 * arcsine oneHalf
+
+-- | Cast a number with two additional digits of precision down to a number
+-- with the desired precision.
+castDown :: (Precision p, Rounding r)
+         => Number (PPlus1 (PPlus1 p)) a -> Number p r
+castDown = cast
+
+notyet :: String -> a
+notyet s = error (s ++ ": not yet implemented")
+
+instance (FinitePrecision p, Rounding r) => Floating (Number p r) where
+  pi = castDown seriesPi
+
+  exp   = notyet "exp"
+  log   = notyet "log"
+
+  sin   = notyet "sin"
+  cos   = notyet "cos"
+  asin  = notyet "asin"
+  acos  = notyet "acos"
+  atan  = notyet "atan"
+  sinh  = notyet "sinh"
+  cosh  = notyet "cosh"
+  asinh = notyet "asinh"
+  acosh = notyet "acosh"
+  atanh = notyet "atanh"
+
+{- $doctest-Floating
+prop> realToFrac (pi :: Double) == (pi :: ExtendedDecimal P16)
+-}
+
+instance (FinitePrecision p, Rounding r) => RealFloat (Number p r) where
+  floatRadix  _ = 10
+  floatDigits x = let Just p = precision x in p
+  floatRange  _ = (minBound, maxBound)  -- ?
+
+  decodeFloat x = case x of
+    Num  { sign = s, coefficient = c, exponent = e } -> (m, n)
+      where m = signFunc s (fromIntegral c)
+            n = fromIntegral e
+    Inf  { sign = s              } -> (special s 0, maxBound    )
+    QNaN { sign = s, payload = p } -> (special s p, minBound    )
+    SNaN { sign = s, payload = p } -> (special s p, minBound + 1)
+    where pp = 10 ^ floatDigits x :: Integer
+          special :: Sign -> Coefficient -> Integer
+          special s v = signFunc s (pp + fromIntegral v)
+
+  encodeFloat m n = x
+    where x | abs m >= pp = special
+            | otherwise   = cast Num { sign        = signMatch m
+                                     , coefficient = fromInteger (abs m)
+                                     , exponent    = fromIntegral n
+                                     }
+          special
+            | n == maxBound     = Inf  { sign = signMatch m }
+            | n == minBound     = QNaN { sign = signMatch m, payload = p }
+            | otherwise         = SNaN { sign = signMatch m, payload = p }
+            where p = fromInteger (abs m - pp)
+          pp = 10 ^ floatDigits x :: Integer
+
+  isNaN x = case x of
+    QNaN{} -> True
+    SNaN{} -> True
+    _      -> False
+
+  isInfinite x = case x of
+    Inf{} -> True
+    _     -> False
+
+  isDenormalized = isSubnormal
+
+  isNegativeZero x = case x of
+    Num { sign = Neg, coefficient = 0 } -> True
+    _                                   -> False
+
+  isIEEE _ = True
+
+{- $doctest-RealFloat
+prop> uncurry encodeFloat (decodeFloat x) == (x :: BasicDecimal)
+prop> isFinite x ==> significand x * fromInteger (floatRadix x) ^^ Prelude.exponent x == (x :: BasicDecimal)
+-}
+
 -- | A 'Number' representing the value zero
 zero :: Number p r
-zero = Num { context     = defaultContext
-           , sign        = Pos
+zero = Num { sign        = Pos
            , coefficient = 0
            , exponent    = 0
            }
 
+-- | A 'Number' representing the value ½
+oneHalf :: Number p r
+oneHalf = zero { coefficient = 5, exponent = -1 }
+
 -- | A 'Number' representing the value one
 one :: Number p r
 one = zero { coefficient = 1 }
+
+-- | A 'Number' representing the value two
+two :: Number p r
+two = zero { coefficient = 2 }
 
 -- | A 'Number' representing the value negative one
 negativeOne :: Number p r
@@ -224,15 +366,15 @@ negativeOne = one { sign = Neg }
 
 -- | A 'Number' representing the value positive infinity
 infinity :: Number p r
-infinity = Inf { context = defaultContext, sign = Pos }
+infinity = Inf { sign = Pos }
 
 -- | A 'Number' representing undefined results
 qNaN :: Number p r
-qNaN = QNaN { context = defaultContext, sign = Pos, payload = 0 }
+qNaN = QNaN { sign = Pos, payload = 0 }
 
 -- | A signaling 'Number' representing undefined results
 sNaN :: Number p r
-sNaN = SNaN { context = defaultContext, sign = Pos, payload = 0 }
+sNaN = SNaN { sign = Pos, payload = 0 }
 
 -- | Negate the given 'Number' by directly flipping its sign.
 flipSign :: Number p r -> Number p r
@@ -242,8 +384,9 @@ flipSign n = n { sign = negateSign (sign n) }
 -- immediately rounding if necessary to the new precision using the new
 -- algorithm.
 cast :: (Precision p, Rounding r) => Number a b -> Number p r
-cast = round . coerce
+cast = numberOp . round . coerce
 
+-- | Return the number of decimal digits of the argument.
 numDigits :: Coefficient -> Int
 numDigits x
   | x <         10 = 1
@@ -256,14 +399,6 @@ numDigits x
   | x <  100000000 = 8
   | x < 1000000000 = 9
   | otherwise      = 9 + numDigits (x `quot` 1000000000)
-
-excessDigits :: Precision p => Number p r -> Maybe Int
-excessDigits x@Num { coefficient = c } = precision x >>= excess
-  where excess p
-          | d > p     = Just (d - p)
-          | otherwise = Nothing
-          where d = numDigits c
-excessDigits _ = Nothing
 
 maxCoefficient :: Precision p => p -> Maybe Coefficient
 maxCoefficient p = (\d -> 10 ^ d - 1) <$> precision p
@@ -336,118 +471,3 @@ adjustedExponent Num { coefficient = c, exponent = e } =
   e + fromIntegral (clength - 1)
   where clength = numDigits c :: Int
 adjustedExponent _ = error "adjustedExponent: not a finite number"
-
-type TrapHandler p r = Signal -> Number p r -> Number p r
-
-data Context p r = Context { signalFlags :: Signals
-                           , trapHandler :: TrapHandler p r
-                           }
-
-instance Precision p => Precision (Context p r) where
-  precision = precision . contextPrecision
-    where contextPrecision :: Context p r -> p
-          contextPrecision = undefined
-
-defaultContext :: Context p r
-defaultContext = Context mempty (const id)
-
-setSignal :: Signal -> Context p r -> Context p r
-setSignal sig cxt = cxt { signalFlags = signalFlags cxt <> signal sig }
-
-modifyContext :: (Context p r -> Context p r) -> Number p r -> Number p r
-modifyContext f n = n { context = f (context n) }
-
-mergeContexts :: Context p r -> Context p r -> Context p r
-mergeContexts cxt1 cxt2 =
-  cxt1 { signalFlags = signalFlags cxt1 <> signalFlags cxt2 }
-
-data Signal
-  = Clamped
-  | DivisionByZero
-  | Inexact
-  | InvalidOperation
-  | Overflow
-  | Rounded
-  | Subnormal
-  | Underflow
-  deriving (Enum, Bounded, Show)
-
-newtype Signals = Signals Int
-
-instance Show Signals where
-  showsPrec d sigs = showParen (d > 10) $
-    showString "signals " . showsPrec 11 (signalList sigs)
-
-instance Monoid Signals where
-  mempty = Signals 0
-  Signals x `mappend` Signals y = Signals (x .|. y)
-
-signal :: Signal -> Signals
-signal = Signals . bit . fromEnum
-
-unsignal :: Signal -> Signals -> Signals
-unsignal sig (Signals ss) = Signals $ ss .&. complement (bit $ fromEnum sig)
-
-signals :: [Signal] -> Signals
-signals = foldr (\s n -> signal s <> n) mempty
-
-signalList :: Signals -> [Signal]
-signalList sigs = filter (testSignal sigs) [minBound..maxBound]
-
-testSignal :: Signals -> Signal -> Bool
-testSignal (Signals ss) = testBit ss . fromEnum
-
-raiseSignal :: Signal -> Number p r -> Number p r
-raiseSignal sig n = let n' = modifyContext (setSignal sig) n
-                    in trapHandler (context n') sig n'
-
-{- $doctest
-prop> x + x == x * (2 :: Decimal)
-prop> isFinite x ==> x - x == (0 :: Decimal)
--}
-
-{- $doctest-read
-prop> rep (read "0")         == N (0,0,0)
-prop> rep (read "0.00")      == N (0,0,-2)
-prop> rep (read "123")       == N (0,123,0)
-prop> rep (read "-123")      == N (1,123,0)
-prop> rep (read "1.23E3")    == N (0,123,1)
-prop> rep (read "1.23E+3")   == N (0,123,1)
-prop> rep (read "12.3E+7")   == N (0,123,6)
-prop> rep (read "12.0")      == N (0,120,-1)
-prop> rep (read "12.3")      == N (0,123,-1)
-prop> rep (read "0.00123")   == N (0,123,-5)
-prop> rep (read "-1.23E-12") == N (1,123,-14)
-prop> rep (read "1234.5E-4") == N (0,12345,-5)
-prop> rep (read "-0")        == N (1,0,0)
-prop> rep (read "-0.00")     == N (1,0,-2)
-prop> rep (read "0E+7")      == N (0,0,7)
-prop> rep (read "-0E-7")     == N (1,0,-7)
-prop> rep (read "inf")       == I (0)
-prop> rep (read "+inFiniTy") == I (0)
-prop> rep (read "-Infinity") == I (1)
-prop> rep (read "NaN")       == Q (0)
-prop> rep (read "-NAN")      == Q (1)
-prop> rep (read "SNaN")      == S (0)
-xxxx> rep (read "Fred")      == Q (0)
-
-prop> fmap rep (read "Just 123")     == Just (N (0,123,0))
-prop> fmap rep (read "Just (-12.0)") == Just (N (1,120,-1))
--}
-
-{- $setup
->>> :load test/Arbitrary.hs
->>> import Numeric.Decimal.Number
->>> import qualified Numeric.Decimal.Number as N
-
->>> type Decimal = BasicDecimal
-
->>> data Rep = N (Int, Coefficient, Exponent) | I Int | Q Int | S Int deriving Eq
->>> :{
-    let rep n = case n :: Decimal of
-            Num  { sign = s, coefficient = c, N.exponent = e } -> N (fromEnum s, c, e)
-            Inf  { sign = s } -> I (fromEnum s)
-            QNaN { sign = s } -> Q (fromEnum s)
-            SNaN { sign = s } -> S (fromEnum s)
-:}
--}
