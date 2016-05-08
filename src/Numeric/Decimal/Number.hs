@@ -177,16 +177,27 @@ instance (Precision p, Rounding r) => Enum (Number p r) where
 
   enumFrom       x     = enumFromWith x one
   enumFromThen   x y   = let i = y - x
-                         in x : y : enumFromWith (y + i) i
+                         in x : enumFromWith y i
   enumFromTo     x   e = takeWhile (<= e) $ enumFromWith x one
   enumFromThenTo x y e = let i = y - x
                              cmp | i < 0     = (>=)
                                  | otherwise = (<=)
-                         in takeWhile (`cmp` e) $ x : y : enumFromWith (y + i) i
+                         in takeWhile (`cmp` e) $ x : enumFromWith y i
 
 enumFromWith :: (Precision p, Rounding r)
              => Number p r -> Number p r -> [Number p r]
 enumFromWith x i = x : enumFromWith (x + i) i
+
+{- $doctest-Enum
+>>> [0, 0.1 .. 2] :: [BasicDecimal]
+[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0]
+
+>>> [2, 1.9 .. 0] :: [BasicDecimal]
+[2,1.9,1.8,1.7,1.6,1.5,1.4,1.3,1.2,1.1,1.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]
+
+>>> [1.7 .. 5.7] :: [BasicDecimal]
+[1.7,2.7,3.7,4.7,5.7]
+-}
 
 instance (Precision p, Rounding r) => Num (Number p r) where
   x + y = numberOp (x `Op.add`      y)
