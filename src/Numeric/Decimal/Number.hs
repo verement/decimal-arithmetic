@@ -346,6 +346,12 @@ instance (FinitePrecision p, Rounding r) => RealFloat (Number p r) where
 {- $doctest-RealFloat
 prop> uncurry encodeFloat (decodeFloat x) == (x :: BasicDecimal)
 prop> isFinite x ==> significand x * fromInteger (floatRadix x) ^^ Prelude.exponent x == (x :: BasicDecimal)
+prop> Prelude.exponent (0 :: BasicDecimal) == 0
+prop> isFinite x && x /= 0 ==> Prelude.exponent (x :: BasicDecimal) == snd (decodeFloat x) + floatDigits x
+
+prop> isNegativeZero (read "-0" :: BasicDecimal) == True
+prop> isNegativeZero (read "+0" :: BasicDecimal) == False
+prop> x /= 0 ==> isNegativeZero (x :: BasicDecimal) == False
 -}
 
 -- | A 'Number' representing the value zero
