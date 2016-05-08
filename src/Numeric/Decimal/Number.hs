@@ -234,9 +234,16 @@ instance (FinitePrecision p, Rounding r) => RealFrac (Number p r) where
     | e < 0     = (n, f)
     | otherwise = (signFunc s (fromIntegral c * 10^e), zero)
     where n = signFunc s (fromIntegral q)
-          f = x { coefficient = r, exponent = -(fromIntegral $ numDigits r) }
+          f = x { coefficient = r }
           (q, r) = c `quotRem` (10^(-e))
   properFraction nan = (0, nan)
+
+{- $doctest-RealFrac
+prop> let (n,f) = properFraction (x :: BasicDecimal) in x == fromIntegral n + f
+prop> let (n,f) = properFraction (x :: BasicDecimal) in (x < 0 && n <= 0) || (x >= 0 && n >= 0)
+prop> let (n,f) = properFraction (x :: BasicDecimal) in (x < 0 && f <= 0) || (x >= 0 && f >= 0)
+prop> let (n,f) = properFraction (x :: BasicDecimal) in isFinite f ==> abs f < 1
+-}
 
 -- | Compute an infinite series to maximum precision.
 infiniteSeries :: (FinitePrecision p, Rounding r) => [Number p r] -> Number p r
