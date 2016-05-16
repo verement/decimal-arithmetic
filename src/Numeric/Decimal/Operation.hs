@@ -33,6 +33,10 @@ import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
 import Numeric.Decimal.Rounding
 
+{- $setup
+>>> :load Harness
+-}
+
 finitePrecision :: FinitePrecision p => Number p r -> Int
 finitePrecision n = let Just p = precision n in p
 
@@ -90,18 +94,53 @@ add inf@Inf{} Num{} = return (coerce inf)
 add Num{} inf@Inf{} = return (coerce inf)
 add x y             = return (toQNaN2 x y)
 
+{- $doctest-add
+>>> op2 Op.add "12" "7.00"
+19.00
+
+>>> op2 Op.add "1E+2" "1E+4"
+1.01E+4
+-}
+
 -- | Subtract the second operand from the first.
 subtract :: (Precision p, Rounding r)
          => Number a b -> Number c d -> Arith p r (Number p r)
 subtract x = add x . flipSign
 
+{- $doctest-subtract
+>>> op2 Op.subtract "1.3" "1.07"
+0.23
+
+>>> op2 Op.subtract "1.3" "1.30"
+0.00
+
+>>> op2 Op.subtract "1.3" "2.07"
+-0.77
+-}
+
 -- | Unary minus (negation)
 minus :: (Precision p, Rounding r) => Number a b -> Arith p r (Number p r)
 minus x = zero { exponent = exponent x } `subtract` x
 
+{- $doctest-minus
+>>> op1 Op.minus "1.3"
+-1.3
+
+>>> op1 Op.minus "-1.3"
+1.3
+-}
+
 -- | Unary plus
 plus :: (Precision p, Rounding r) => Number a b -> Arith p r (Number p r)
 plus x = zero { exponent = exponent x } `add` x
+
+{- $doctest-plus
+>>> op1 Op.plus "1.3"
+1.3
+
+>>> op1 Op.plus "-1.3"
+-1.3
+-}
 
 -- | Multiply two operands.
 multiply :: (Precision p, Rounding r)
@@ -122,6 +161,23 @@ multiply Inf { sign = xs } Num { sign = ys } =
 multiply Num { sign = xs } Inf { sign = ys } =
   return Inf { sign = xorSigns xs ys }
 multiply x y = return (toQNaN2 x y)
+
+{- $doctest-multiply
+>>> op2 Op.multiply "1.20" "3"
+3.60
+
+>>> op2 Op.multiply "7" "3"
+21
+
+>>> op2 Op.multiply "0.9" "0.8"
+0.72
+
+>>> op2 Op.multiply "0.9" "-0"
+-0.0
+
+>>> op2 Op.multiply "654321" "654321"
+4.28135971E+11
+-}
 
 -- | Divide the first dividend operand by the second divisor using long division.
 divide :: (FinitePrecision p, Rounding r)
@@ -152,6 +208,38 @@ divide Inf { sign = xs } Num { sign = ys } =
 divide Num { sign = xs } Inf { sign = ys } =
   return zero { sign = xorSigns xs ys }
 divide x y = return (toQNaN2 x y)
+
+{- $doctest-divide
+>>> op2 Op.divide "1" "3"
+0.333333333
+
+>>> op2 Op.divide "2" "3"
+0.666666667
+
+>>> op2 Op.divide "5" "2"
+2.5
+
+>>> op2 Op.divide "1" "10"
+0.1
+
+>>> op2 Op.divide "12" "12"
+1
+
+>>> op2 Op.divide "8.00" "2"
+4.00
+
+>>> op2 Op.divide "2.400" "2.0"
+1.20
+
+>>> op2 Op.divide "1000" "100"
+10
+
+>>> op2 Op.divide "1000" "1"
+1000
+
+>>> op2 Op.divide "2.40E+6" "2"
+1.20E+6
+-}
 
 type Dividend  = Coefficient
 type Divisor   = Coefficient
@@ -186,6 +274,20 @@ abs x
   | isNegative x = minus x
   | otherwise    = plus  x
 
+{- $doctest-abs
+>>> op1 Op.abs "2.1"
+2.1
+
+>>> op1 Op.abs "-100"
+100
+
+>>> op1 Op.abs "101.5"
+101.5
+
+>>> op1 Op.abs "-101.5"
+101.5
+-}
+
 -- | Compare the values of two operands numerically, returning @-1@ if the
 -- first is less than the second, @0@ if they are equal, or @1@ if the first
 -- is greater than the second.
@@ -219,3 +321,23 @@ compare Num { } Inf { sign = ys }
 compare nan@SNaN{} _ = invalidOperation nan
 compare _ nan@SNaN{} = invalidOperation nan
 compare x y          = return (toQNaN2 x y)
+
+{- $doctest-compare
+>>> op2 Op.compare "2.1" "3"
+-1
+
+>>> op2 Op.compare "2.1" "2.1"
+0
+
+>>> op2 Op.compare "2.1" "2.10"
+0
+
+>>> op2 Op.compare "3" "2.1"
+1
+
+>>> op2 Op.compare "2.1" "-3"
+1
+
+>>> op2 Op.compare "-3" "2.1"
+-1
+-}
