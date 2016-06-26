@@ -34,7 +34,7 @@ data RoundingAlgorithm = RoundDown
 -- exceeds the precision of the result type
 class Rounding r where
   rounding :: r -> RoundingAlgorithm
-  round :: Precision p => Number p r -> Arith p r (Number p r)
+  round :: Precision p => Decimal p r -> Arith p r (Decimal p r)
 
 -- Required...
 
@@ -97,7 +97,7 @@ instance Rounding Round05Up where
 
 -- Implementations
 
-excessDigits :: Precision p => Number p r -> Arith p r (Maybe Int)
+excessDigits :: Precision p => Decimal p r -> Arith p r (Maybe Int)
 excessDigits n@Num { coefficient = c } = result
   where result = return (precision n >>= excess)
         d = numDigits c
@@ -107,8 +107,8 @@ excessDigits n@Num { coefficient = c } = result
 excessDigits _ = return Nothing
 
 rounded :: (Coefficient -> Coefficient -> Coefficient ->
-            Number p r -> Number p r -> Number p r)
-        -> Int -> Number p r -> Arith p r (Number p r)
+            Decimal p r -> Decimal p r -> Decimal p r)
+        -> Int -> Decimal p r -> Arith p r (Decimal p r)
 rounded f d n = raiseSignal Rounded =<< rounded'
   where rounded'
           | r /= 0    = raiseSignal Inexact n'
@@ -123,14 +123,14 @@ rounded f d n = raiseSignal Rounded =<< rounded'
                , exponent = exponent n + fromIntegral d
                }
 
-roundDown :: Precision p => Number p r -> Arith p r (Number p r)
+roundDown :: Precision p => Decimal p r -> Arith p r (Decimal p r)
 roundDown n = excessDigits n >>= roundDown'
   where roundDown' Nothing  = return n
         roundDown' (Just d) = rounded choice d n
 
         choice _h _q _r down _up = down
 
-roundHalfUp :: Precision p => Number p r -> Arith p r (Number p r)
+roundHalfUp :: Precision p => Decimal p r -> Arith p r (Decimal p r)
 roundHalfUp n = excessDigits n >>= roundHalfUp'
   where roundHalfUp' Nothing  = return n
         roundHalfUp' (Just d) = rounded choice d n
@@ -139,7 +139,7 @@ roundHalfUp n = excessDigits n >>= roundHalfUp'
           | r >= h    = up
           | otherwise = down
 
-roundHalfEven :: Precision p => Number p r -> Arith p r (Number p r)
+roundHalfEven :: Precision p => Decimal p r -> Arith p r (Decimal p r)
 roundHalfEven n = excessDigits n >>= roundHalfEven'
   where roundHalfEven' Nothing  = return n
         roundHalfEven' (Just d) = rounded choice d n
@@ -150,7 +150,7 @@ roundHalfEven n = excessDigits n >>= roundHalfEven'
           EQ | even q    -> down
              | otherwise -> up
 
-roundCeiling :: Precision p => Number p r -> Arith p r (Number p r)
+roundCeiling :: Precision p => Decimal p r -> Arith p r (Decimal p r)
 roundCeiling n = excessDigits n >>= roundCeiling'
   where roundCeiling' Nothing  = return n
         roundCeiling' (Just d) = rounded choice d n
@@ -159,7 +159,7 @@ roundCeiling n = excessDigits n >>= roundCeiling'
           | r == 0 || sign n == Neg = down
           | otherwise               = up
 
-roundFloor :: Precision p => Number p r -> Arith p r (Number p r)
+roundFloor :: Precision p => Decimal p r -> Arith p r (Decimal p r)
 roundFloor n = excessDigits n >>= roundFloor'
   where roundFloor' Nothing  = return n
         roundFloor' (Just d) = rounded choice d n
@@ -168,7 +168,7 @@ roundFloor n = excessDigits n >>= roundFloor'
           | r == 0 || sign n == Pos = down
           | otherwise               = up
 
-roundHalfDown :: Precision p => Number p r -> Arith p r (Number p r)
+roundHalfDown :: Precision p => Decimal p r -> Arith p r (Decimal p r)
 roundHalfDown n = excessDigits n >>= roundHalfDown'
   where roundHalfDown' Nothing  = return n
         roundHalfDown' (Just d) = rounded choice d n
@@ -177,7 +177,7 @@ roundHalfDown n = excessDigits n >>= roundHalfDown'
           | r > h     = up
           | otherwise = down
 
-roundUp :: Precision p => Number p r -> Arith p r (Number p r)
+roundUp :: Precision p => Decimal p r -> Arith p r (Decimal p r)
 roundUp n = excessDigits n >>= roundUp'
   where roundUp' Nothing  = return n
         roundUp' (Just d) = rounded choice d n
@@ -186,7 +186,7 @@ roundUp n = excessDigits n >>= roundUp'
           | r == 0    = down
           | otherwise = up
 
-round05Up :: Precision p => Number p r -> Arith p r (Number p r)
+round05Up :: Precision p => Decimal p r -> Arith p r (Decimal p r)
 round05Up n = excessDigits n >>= round05Up'
   where round05Up' Nothing  = return n
         round05Up' (Just d) = rounded choice d n

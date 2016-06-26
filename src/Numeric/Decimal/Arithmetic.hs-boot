@@ -36,8 +36,8 @@ data Signal
   | Rounded
   | Subnormal
   | Underflow
-raiseSignal :: Signal -> Number p r -> Arith p r (Number p r)
+raiseSignal :: Signal -> Decimal p r -> Arith p r (Decimal p r)
 
 type role Exception phantom phantom
 data Exception p r
-exceptionResult :: Exception p r -> Number p r
+exceptionResult :: Exception p r -> Decimal p r

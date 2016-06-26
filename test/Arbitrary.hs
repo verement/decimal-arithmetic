@@ -6,24 +6,24 @@ module Arbitrary
 import Numeric.Decimal
 import Test.QuickCheck
 
-infinity :: (Precision p, Rounding r) => Number p r
+infinity :: (Precision p, Rounding r) => Decimal p r
 infinity = read "Infinity"
 
-instance (Precision p, Rounding r) => Arbitrary (Number p r) where
+instance (Precision p, Rounding r) => Arbitrary (Decimal p r) where
   arbitrary = frequency [(85, genNum), (10, genInf)]
 
-genNum :: (Precision p, Rounding r) => Gen (Number p r)
+genNum :: (Precision p, Rounding r) => Gen (Decimal p r)
 genNum = do
   c <- choose (-(10^10), 10^10) :: Gen Integer
   e <- choose (-99, 99)         :: Gen Integer
   return $ read (show c ++ 'E' : show e)
 
-genInf :: (Precision p, Rounding r) => Gen (Number p r)
+genInf :: (Precision p, Rounding r) => Gen (Decimal p r)
 genInf = do
   s <- elements [-1, 1]
   return (s * infinity)
 
-genNaN :: (Precision p, Rounding r) => Gen (Number p r)
+genNaN :: (Precision p, Rounding r) => Gen (Decimal p r)
 genNaN = oneof [nan "", nan "s"]
   where nan kind = do
           s <- elements ["", "-"]

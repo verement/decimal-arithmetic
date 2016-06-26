@@ -4,7 +4,7 @@
 
 module Numeric.Decimal.Number
        ( Sign(..)
-       , Number(..)
+       , Decimal(..)
        , Coefficient
        , numDigits
        ) where
@@ -20,8 +20,8 @@ type Coefficient = Natural
 type Exponent    = Int
 type Payload     = Coefficient
 
-type role Number phantom phantom
-data Number p r
+type role Decimal phantom phantom
+data Decimal p r
   = Num  { sign        :: Sign
          , coefficient :: Coefficient
          , exponent    :: Exponent
@@ -35,6 +35,6 @@ data Number p r
          , payload     :: Payload
          }
 
-instance Precision p => Precision (Number p r)
+instance Precision p => Precision (Decimal p r)
 
 numDigits :: Coefficient -> Int

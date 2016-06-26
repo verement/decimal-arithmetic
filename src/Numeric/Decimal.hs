@@ -6,7 +6,7 @@ License     : BSD3
 Maintainer  : rob@mars.org
 Stability   : experimental
 
-This module provides a general-purpose 'Number' type supporting decimal
+This module provides a general-purpose number type supporting decimal
 arithmetic for both limited precision floating-point (IEEE 754-2008) and for
 arbitrary precision floating-point (following the same principles as IEEE 754
 and IEEE 854-1987) as described in the
@@ -14,13 +14,12 @@ and IEEE 854-1987) as described in the
 by Mike Cowlishaw. In addition to floating-point arithmetic, integer and
 unrounded floating-point arithmetic are included as subsets.
 
-Unlike the binary floating-point types 'Float' and 'Double', the 'Number' type
-can represent and perform arithmetic with decimal numbers exactly.
-Internally, a 'Number' is represented with an integral coefficient and base-10
-exponent.
+Unlike the binary floating-point types 'Float' and 'Double', decimal number
+types can perform decimal arithmetic exactly. Internally, decimal numbers are
+represented with an integral coefficient and base-10 exponent.
 
-The 'Number' type supports lossless conversion to and from a string
-representation via the 'Show' and 'Read' instances. Note that there may be
+Decimal numbers support lossless conversion to and from a string
+representation via 'Show' and 'Read' instances. Note that there may be
 multiple representations of values that are numerically equal (e.g. 1 and
 1.00) which are preserved by this conversion.
 -}
@@ -29,7 +28,7 @@ module Numeric.Decimal
          -- $usage
 
          -- * Arbitrary-precision decimal numbers
-         Number
+         Decimal
        , BasicDecimal
        , ExtendedDecimal
        , GeneralDecimal
@@ -59,11 +58,11 @@ import Numeric.Decimal.Rounding
 
 -- | A decimal floating point number with 9 digits of precision, rounding half
 -- up
-type BasicDecimal = Number P9 RoundHalfUp
+type BasicDecimal = Decimal P9 RoundHalfUp
 
 -- | A decimal floating point number with selectable precision, rounding half
 -- even
-type ExtendedDecimal p = Number p RoundHalfEven
+type ExtendedDecimal p = Decimal p RoundHalfEven
 
 -- | A decimal floating point number with infinite precision
 type GeneralDecimal = ExtendedDecimal PInfinite
@@ -76,25 +75,25 @@ rounding to use in your application. There are several options:
 * 'BasicDecimal' is a number type with 9 decimal digits of precision that
 rounds half up.
 
-* 'ExtendedDecimal' is a number type with selectable precision that rounds
-half even. For example, 'ExtendedDecimal' 'P34' is a number type with 34
-decimal digits of precision. There are a range of ready-made precisions
-available, including 'P1' through 'P50' on up to 'P2000'.  Alternatively, an
-arbitrary precision can be constructed through type application of 'PPlus1'
-and/or 'PTimes2' to any existing precision.
+* 'ExtendedDecimal' is a number type constructor with selectable precision
+that rounds half even. For example, @'ExtendedDecimal' 'P34'@ is a number type
+with 34 decimal digits of precision. There are a range of ready-made
+precisions available, including 'P1' through 'P50' on up to 'P2000'.
+Alternatively, an arbitrary precision can be constructed through type
+application of 'PPlus1' and/or 'PTimes2' to any existing precision.
 
 * 'GeneralDecimal' is a number type with infinite precision. Note that not all
 operations support numbers with infinite precision.
 
-* The most versatile 'Number' type is parameterized by both a precision and a
-rounding algorithm. For example, 'Number' 'P20' 'RoundDown' is a number type
-with 20 decimal digits of precision that rounds down (truncates). Several
-'Rounding' algorithms are available to choose from.
+* The most versatile 'Decimal' type constructor is parameterized by both a
+precision and a rounding algorithm. For example, @'Decimal' 'P20' 'RoundDown'@
+is a number type with 20 decimal digits of precision that rounds down
+(truncates). Several 'Rounding' algorithms are available to choose from.
 
 It is suggested to create an alias for the type of numbers you wish to support
 in your application. For example:
 
-> type Decimal = ExtendedDecimal P16
+> type Number = ExtendedDecimal P16
 
 A decimal number type may be used in a @default@ declaration, possibly
 replacing 'Double' or 'Integer'. For example:

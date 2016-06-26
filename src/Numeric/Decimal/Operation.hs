@@ -37,7 +37,7 @@ import Numeric.Decimal.Rounding
 >>> :load Harness
 -}
 
-finitePrecision :: FinitePrecision p => Number p r -> Int
+finitePrecision :: FinitePrecision p => Decimal p r -> Int
 finitePrecision n = let Just p = precision n in p
 
 roundingAlg :: Rounding r => Arith p r a -> RoundingAlgorithm
@@ -45,20 +45,20 @@ roundingAlg = rounding . arithRounding
   where arithRounding :: Arith p r a -> r
         arithRounding = undefined
 
-result :: (Precision p, Rounding r) => Number p r -> Arith p r (Number p r)
+result :: (Precision p, Rounding r) => Decimal p r -> Arith p r (Decimal p r)
 result = round  -- ...
 --  | maybe False (numDigits c >) (precision r) = undefined
 
-invalidOperation :: Number a b -> Arith p r (Number p r)
+invalidOperation :: Decimal a b -> Arith p r (Decimal p r)
 invalidOperation n = raiseSignal InvalidOperation qNaN
 
-toQNaN :: Number a b -> Number p r
+toQNaN :: Decimal a b -> Decimal p r
 toQNaN SNaN { sign = s, payload = p } =
   QNaN { sign = s, payload = p }
 toQNaN n@QNaN{} = coerce n
 toQNaN n = qNaN { sign = sign n }
 
-toQNaN2 :: Number a b -> Number c d -> Number p r
+toQNaN2 :: Decimal a b -> Decimal c d -> Decimal p r
 toQNaN2 nan@SNaN{} _ = toQNaN nan
 toQNaN2 _ nan@SNaN{} = toQNaN nan
 toQNaN2 nan@QNaN{} _ = coerce nan
@@ -67,7 +67,7 @@ toQNaN2 n _          = toQNaN n
 
 -- | Add two operands.
 add :: (Precision p, Rounding r)
-    => Number a b -> Number c d -> Arith p r (Number p r)
+    => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 add Num { sign = xs, coefficient = xc, exponent = xe }
     Num { sign = ys, coefficient = yc, exponent = ye } = sum
 
@@ -104,7 +104,7 @@ add x y             = return (toQNaN2 x y)
 
 -- | Subtract the second operand from the first.
 subtract :: (Precision p, Rounding r)
-         => Number a b -> Number c d -> Arith p r (Number p r)
+         => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 subtract x = add x . flipSign
 
 {- $doctest-subtract
@@ -119,7 +119,7 @@ subtract x = add x . flipSign
 -}
 
 -- | Unary minus (negation)
-minus :: (Precision p, Rounding r) => Number a b -> Arith p r (Number p r)
+minus :: (Precision p, Rounding r) => Decimal a b -> Arith p r (Decimal p r)
 minus x = zero { exponent = exponent x } `subtract` x
 
 {- $doctest-minus
@@ -131,7 +131,7 @@ minus x = zero { exponent = exponent x } `subtract` x
 -}
 
 -- | Unary plus
-plus :: (Precision p, Rounding r) => Number a b -> Arith p r (Number p r)
+plus :: (Precision p, Rounding r) => Decimal a b -> Arith p r (Decimal p r)
 plus x = zero { exponent = exponent x } `add` x
 
 {- $doctest-plus
@@ -144,7 +144,7 @@ plus x = zero { exponent = exponent x } `add` x
 
 -- | Multiply two operands.
 multiply :: (Precision p, Rounding r)
-         => Number a b -> Number c d -> Arith p r (Number p r)
+         => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 multiply Num { sign = xs, coefficient = xc, exponent = xe }
          Num { sign = ys, coefficient = yc, exponent = ye } =
   result rn
@@ -181,7 +181,7 @@ multiply x y = return (toQNaN2 x y)
 
 -- | Divide the first dividend operand by the second divisor using long division.
 divide :: (FinitePrecision p, Rounding r)
-       => Number a b -> Number c d -> Arith p r (Number p r)
+       => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 divide dividend@Num{ sign = xs } Num { coefficient = 0, sign = ys }
   | isZero dividend = invalidOperation qNaN
   | otherwise       = raiseSignal DivisionByZero
@@ -276,7 +276,7 @@ longDivision dd dv p = step1 dd dv 0
 -- | If the operand is negative, the result is the same as using the 'minus'
 -- operation on the operand. Otherwise, the result is the same as using the
 -- 'plus' operation on the operand.
-abs :: (Precision p, Rounding r) => Number a b -> Arith p r (Number p r)
+abs :: (Precision p, Rounding r) => Decimal a b -> Arith p r (Decimal p r)
 abs x
   | isNegative x = minus x
   | otherwise    = plus  x
@@ -299,13 +299,13 @@ abs x
 -- first is less than the second, @0@ if they are equal, or @1@ if the first
 -- is greater than the second.
 compare :: (Precision p, Rounding r)
-        => Number a b -> Number c d -> Arith p r (Number p r)
+        => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 compare x@Num{} y@Num{} = nzp <$> (xn `subtract` yn)
 
   where (xn, yn) | sign x /= sign y = (nzp x, nzp y)
                  | otherwise        = (x, y)
 
-        nzp :: Number p r -> Number p r
+        nzp :: Decimal p r -> Decimal p r
         nzp Num { sign = s, coefficient = c }
           | c == 0    = zero
           | s == Pos  = one

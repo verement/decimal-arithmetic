@@ -43,9 +43,6 @@ read' p str = case [ x | (x, "") <- readP_to_S p str ] of
   [x] -> x
   _   -> error "read failed"
 
-castDown :: (Precision p, Rounding r)
-         => Number (PPlus1 (PPlus1 p)) a -> Number p r
-castDown = cast
 
 op1 :: (BasicDecimal -> Arith P9 RoundHalfUp BasicDecimal)
     -> String -> BasicDecimal

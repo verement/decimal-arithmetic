@@ -2,6 +2,6 @@
 
 * To Do
 ** Test suite
-** instance Floating (Number p r)
-** instance RealFloat (Number p r)
-** instance PrintfArg (Number p r)
+** instance Floating (Decimal p r)
+** instance RealFloat (Decimal p r)
+** instance PrintfArg (Decimal p r)

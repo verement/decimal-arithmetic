@@ -1,6 +1,6 @@
 
 name:                decimal-arithmetic
-version:             0.1.0.1
+version:             0.2.0.0
 
 synopsis:            An implementation of Mike Cowlishaw's
                      General Decimal Arithmetic Specification

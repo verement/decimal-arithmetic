@@ -1,5 +1,5 @@
 
--- | The functions in this module implement conversions between 'Number' and
+-- | The functions in this module implement conversions between 'Decimal' and
 -- 'String' as described in the /General Decimal Arithmetic Specification/.
 --
 -- Because these functions are also used to implement 'Show' and 'Read' class
@@ -99,7 +99,7 @@ prop> read' toNumber (show' toEngineeringString x) == x
 
 -- | Convert a number to a string, using scientific notation if an exponent is
 -- needed.
-toScientificString :: Number p r -> ShowS
+toScientificString :: Decimal p r -> ShowS
 toScientificString = showNumber exponential
 
   where exponential :: Exponent -> String -> Exponent -> ShowS
@@ -172,7 +172,7 @@ toScientificString = showNumber exponential
 
 -- | Convert a number to a string, using engineering notation if an exponent
 -- is needed.
-toEngineeringString :: Number p r -> ShowS
+toEngineeringString :: Decimal p r -> ShowS
 toEngineeringString = showNumber exponential
 
   where exponential :: Exponent -> String -> Exponent -> ShowS
@@ -225,7 +225,7 @@ toEngineeringString = showNumber exponential
 -}
 
 showNumber :: (Exponent -> String -> Exponent -> ShowS)
-           -> Number p r -> ShowS
+           -> Decimal p r -> ShowS
 showNumber exponential num = signStr . case num of
   Num { coefficient = c, exponent = e }
     | e <= 0 && ae >= -6 -> nonExponential
@@ -268,21 +268,21 @@ showExponent e
 -- | Convert a string to a number, as defined by its abstract representation.
 -- The string is expected to conform to the numeric string syntax described
 -- here.
-toNumber :: ReadP (Number PInfinite r)
+toNumber :: ReadP (Decimal PInfinite r)
 toNumber = parseSign flipSign <*> parseNumericString
 
   where parseSign :: (a -> a) -> ReadP (a -> a)
         parseSign negate = char '-' *> pure negate
           <|> optional (char '+') *> pure id
 
-        parseNumericString :: ReadP (Number p r)
+        parseNumericString :: ReadP (Decimal p r)
         parseNumericString = parseNumericValue <|> parseNaN
 
-        parseNumericValue :: ReadP (Number p r)
+        parseNumericValue :: ReadP (Decimal p r)
         parseNumericValue = parseDecimalPart <*> option 0 parseExponentPart
           <|> parseInfinity
 
-        parseDecimalPart :: ReadP (Exponent -> Number p r)
+        parseDecimalPart :: ReadP (Exponent -> Decimal p r)
         parseDecimalPart = digitsWithPoint <|> digitsWithOptionalPoint
 
           where digitsWithPoint = do
@@ -318,21 +318,21 @@ toNumber = parseSign flipSign <*> parseNumericString
           parseString "E"
           parseSign negate <*> (readDigits <$> many1 parseDigit)
 
-        parseInfinity :: ReadP (Number p r)
+        parseInfinity :: ReadP (Decimal p r)
         parseInfinity = do
           parseString "Inf"
           optional $ parseString "inity"
           return Inf { sign = Pos }
 
-        parseNaN :: ReadP (Number p r)
+        parseNaN :: ReadP (Decimal p r)
         parseNaN = parseQNaN <|> parseSNaN
 
-        parseQNaN :: ReadP (Number p r)
+        parseQNaN :: ReadP (Decimal p r)
         parseQNaN = do
           p <- parseNaNPayload
           return QNaN { sign = Pos, payload = p }
 
-        parseSNaN :: ReadP (Number p r)
+        parseSNaN :: ReadP (Decimal p r)
         parseSNaN = do
           parseString "s"
           p <- parseNaNPayload

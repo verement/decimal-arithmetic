@@ -113,7 +113,7 @@ data Exception p r =
   Exception { exceptionSignal :: Signal
                                  -- ^ The signal raised by the exceptional
                                  -- condition
-            , exceptionResult :: Number p r
+            , exceptionResult :: Decimal p r
                                  -- ^ The defined result for the exceptional
                                  -- condition
             }
@@ -222,7 +222,7 @@ testSignal sig (Signals ss) = testBit ss (fromEnum sig)
 -- | Set the given signal flag in the context of the current arithmetic
 -- computation, and call the trap handler if the trap for this signal is
 -- currently enabled.
-raiseSignal :: Signal -> Number p r -> Arith p r (Number p r)
+raiseSignal :: Signal -> Decimal p r -> Arith p r (Decimal p r)
 raiseSignal sig n = do
   ctx <- get
   let ctx' = ctx { flags = flags ctx <> signal sig }
@@ -243,7 +243,7 @@ clearFlags sigs = modify $ \ctx -> ctx { flags = unsignal sigs (flags ctx) }
 --
 -- Care should be taken not to cause additional traps that might result in an
 -- infinite loop.
-type TrapHandler p r = Exception p r -> Arith p r (Number p r)
+type TrapHandler p r = Exception p r -> Arith p r (Decimal p r)
 
 -- | Set the trap handler function for the context of the current arithmetic
 -- computation. The handler will be called whenever a signal is raised for

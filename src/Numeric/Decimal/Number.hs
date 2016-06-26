@@ -10,7 +10,7 @@ module Numeric.Decimal.Number
        , Exponent
        , Payload
 
-       , Number(..)
+       , Decimal(..)
        , zero
        , one
        , negativeOne
@@ -78,7 +78,7 @@ type Payload     = Coefficient
 
 -- | A decimal floating point number with selectable precision and rounding
 -- algorithm
-data Number p r
+data Decimal p r
   = Num  { sign        :: Sign
          , coefficient :: Coefficient
          , exponent    :: Exponent
@@ -92,10 +92,10 @@ data Number p r
          , payload     :: Payload
          }
 
-instance Show (Number p r) where
+instance Show (Decimal p r) where
   showsPrec d n = showParen (d > 0 && isNegative n) $ toScientificString n
 
-instance (Precision p, Rounding r) => Read (Number p r) where
+instance (Precision p, Rounding r) => Read (Decimal p r) where
   readsPrec _ str = [ (cast n, s)
                     | (n, s) <- readParen False
                       (readP_to_S toNumber . dropWhile isSpace) str ]
@@ -108,43 +108,43 @@ Just (N (0,123,0))
 Just (N (1,120,-1))
 -}
 
-instance Precision p => Precision (Number p r) where
-  precision = precision . numberPrecision
-    where numberPrecision :: Number p r -> p
-          numberPrecision = undefined
+instance Precision p => Precision (Decimal p r) where
+  precision = precision . decimalPrecision
+    where decimalPrecision :: Decimal p r -> p
+          decimalPrecision = undefined
 
-numberOp :: (Precision p, Rounding r) => Arith p r (Number p r) -> Number p r
+numberOp :: (Precision p, Rounding r) => Arith p r (Decimal p r) -> Decimal p r
 numberOp op = either exceptionResult id $ evalArith op newContext
 
-type GeneralNumber = Number PInfinite RoundDown
+type GeneralDecimal = Decimal PInfinite RoundHalfEven
 
-instance Eq (Number p r) where
-  x == y = case numberOp (x `Op.compare` y) :: GeneralNumber of
+instance Eq (Decimal p r) where
+  x == y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
     Num { coefficient = 0 } -> True
     _                       -> False
 
-instance Ord (Number p r) where
-  x `compare` y = case numberOp (x `Op.compare` y) :: GeneralNumber of
+instance Ord (Decimal p r) where
+  x `compare` y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
     Num { coefficient = 0 } -> EQ
     Num { sign = Neg      } -> LT
     Num { sign = Pos      } -> GT
     _                       -> GT  -- match Prelude behavior for NaN
 
-  x < y = case numberOp (x `Op.compare` y) :: GeneralNumber of
+  x < y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
     Num { sign = Neg      } -> True
     _                       -> False
 
-  x <= y = case numberOp (x `Op.compare` y) :: GeneralNumber of
+  x <= y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
     Num { sign = Neg      } -> True
     Num { coefficient = 0 } -> True
     _                       -> False
 
-  x > y = case numberOp (x `Op.compare` y) :: GeneralNumber of
+  x > y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
     Num { coefficient = 0 } -> False
     Num { sign = Pos      } -> True
     _                       -> False
 
-  x >= y = case numberOp (x `Op.compare` y) :: GeneralNumber of
+  x >= y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
     Num { sign = Pos      } -> True
     _                       -> False
 
@@ -164,7 +164,7 @@ instance Ord (Number p r) where
     | x < y     = x
     | otherwise = y
 
-instance (Precision p, Rounding r) => Enum (Number p r) where
+instance (Precision p, Rounding r) => Enum (Decimal p r) where
   succ x = numberOp (x `Op.add`      one)
   pred x = numberOp (x `Op.subtract` one)
 
@@ -185,7 +185,7 @@ instance (Precision p, Rounding r) => Enum (Number p r) where
                          in takeWhile (`cmp` e) $ x : enumFromWith y i
 
 enumFromWith :: (Precision p, Rounding r)
-             => Number p r -> Number p r -> [Number p r]
+             => Decimal p r -> Decimal p r -> [Decimal p r]
 enumFromWith x i = x : enumFromWith (x + i) i
 
 {- $doctest-Enum
@@ -199,7 +199,7 @@ enumFromWith x i = x : enumFromWith (x + i) i
 [1.7,2.7,3.7,4.7,5.7]
 -}
 
-instance (Precision p, Rounding r) => Num (Number p r) where
+instance (Precision p, Rounding r) => Num (Decimal p r) where
   x + y = numberOp (x `Op.add`      y)
   x - y = numberOp (x `Op.subtract` y)
   x * y = numberOp (x `Op.multiply` y)
@@ -228,7 +228,7 @@ prop> abs x >= (0 :: GeneralDecimal)
 prop> abs x * signum x == (x :: GeneralDecimal)
 -}
 
-instance (Precision p, Rounding r) => Real (Number p r) where
+instance (Precision p, Rounding r) => Real (Decimal p r) where
   toRational Num { sign = s, coefficient = c, exponent = e }
     | e >= 0    = fromInteger $ signFunc s (fromIntegral c * 10^e)
     | otherwise = signFunc s (fromIntegral c) % 10^(-e)
@@ -236,11 +236,11 @@ instance (Precision p, Rounding r) => Real (Number p r) where
     Inf{} -> GHC.Real.infinity
     _     -> GHC.Real.notANumber
 
-instance (FinitePrecision p, Rounding r) => Fractional (Number p r) where
+instance (FinitePrecision p, Rounding r) => Fractional (Decimal p r) where
   x / y = numberOp (x `Op.divide` y)
   fromRational r = fromInteger (numerator r) / fromInteger (denominator r)
 
-instance (FinitePrecision p, Rounding r) => RealFrac (Number p r) where
+instance (FinitePrecision p, Rounding r) => RealFrac (Decimal p r) where
   properFraction x@Num { sign = s, coefficient = c, exponent = e }
     | e < 0     = (n, f)
     | otherwise = (signFunc s (fromIntegral c * 10^e), zero)
@@ -257,7 +257,8 @@ prop> let (n,f) = properFraction (x :: BasicDecimal) in isFinite f ==> abs f < 1
 -}
 
 -- | Compute an infinite series to maximum precision.
-infiniteSeries :: (FinitePrecision p, Rounding r) => [Number p r] -> Number p r
+infiniteSeries :: (FinitePrecision p, Rounding r)
+               => [Decimal p r] -> Decimal p r
 infiniteSeries = series zero
   where series n (x:xs)
           | n' == n   = n'
@@ -267,7 +268,7 @@ infiniteSeries = series zero
 
 -- | Compute the arcsine of the argument to maximum precision using series
 -- expansion.
-arcsine :: (FinitePrecision p, Rounding r) => Number p r -> Number p r
+arcsine :: (FinitePrecision p, Rounding r) => Decimal p r -> Decimal p r
 arcsine x = infiniteSeries (x : series 1 2 x 3)
   where series n d x i =
           let x' = x * x2
@@ -275,19 +276,19 @@ arcsine x = infiniteSeries (x : series 1 2 x 3)
         x2 = x * x
 
 -- | Compute π to maximum precision using the arcsine series expansion.
-seriesPi :: FinitePrecision p => Number p RoundHalfEven
+seriesPi :: FinitePrecision p => Decimal p RoundHalfEven
 seriesPi = 6 * arcsine oneHalf
 
 -- | Cast a number with two additional digits of precision down to a number
 -- with the desired precision.
 castDown :: (Precision p, Rounding r)
-         => Number (PPlus1 (PPlus1 p)) a -> Number p r
+         => Decimal (PPlus1 (PPlus1 p)) a -> Decimal p r
 castDown = cast
 
 notyet :: String -> a
 notyet s = error (s ++ ": not yet implemented")
 
-instance (FinitePrecision p, Rounding r) => Floating (Number p r) where
+instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   pi = castDown seriesPi
 
   exp   = notyet "exp"
@@ -308,7 +309,7 @@ instance (FinitePrecision p, Rounding r) => Floating (Number p r) where
 prop> realToFrac (pi :: ExtendedDecimal P16) == (pi :: Double)
 -}
 
-instance (FinitePrecision p, Rounding r) => RealFloat (Number p r) where
+instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
   floatRadix  _ = 10
   floatDigits x = let Just p = precision x in p
   floatRange  _ = (minBound, maxBound)  -- ?
@@ -366,49 +367,49 @@ prop> isNegativeZero (read "+0" :: BasicDecimal) == False
 prop> x /= 0 ==> isNegativeZero (x :: BasicDecimal) == False
 -}
 
--- | A 'Number' representing the value zero
-zero :: Number p r
+-- | A 'Decimal' representing the value zero
+zero :: Decimal p r
 zero = Num { sign        = Pos
            , coefficient = 0
            , exponent    = 0
            }
 
--- | A 'Number' representing the value ½
-oneHalf :: Number p r
+-- | A 'Decimal' representing the value ½
+oneHalf :: Decimal p r
 oneHalf = zero { coefficient = 5, exponent = -1 }
 
--- | A 'Number' representing the value one
-one :: Number p r
+-- | A 'Decimal' representing the value one
+one :: Decimal p r
 one = zero { coefficient = 1 }
 
--- | A 'Number' representing the value two
-two :: Number p r
+-- | A 'Decimal' representing the value two
+two :: Decimal p r
 two = zero { coefficient = 2 }
 
--- | A 'Number' representing the value negative one
-negativeOne :: Number p r
+-- | A 'Decimal' representing the value negative one
+negativeOne :: Decimal p r
 negativeOne = one { sign = Neg }
 
--- | A 'Number' representing the value positive infinity
-infinity :: Number p r
+-- | A 'Decimal' representing the value positive infinity
+infinity :: Decimal p r
 infinity = Inf { sign = Pos }
 
--- | A 'Number' representing undefined results
-qNaN :: Number p r
+-- | A 'Decimal' representing undefined results
+qNaN :: Decimal p r
 qNaN = QNaN { sign = Pos, payload = 0 }
 
--- | A signaling 'Number' representing undefined results
-sNaN :: Number p r
+-- | A signaling 'Decimal' representing undefined results
+sNaN :: Decimal p r
 sNaN = SNaN { sign = Pos, payload = 0 }
 
--- | Negate the given 'Number' by directly flipping its sign.
-flipSign :: Number p r -> Number p r
+-- | Negate the given 'Decimal' by directly flipping its sign.
+flipSign :: Decimal p r -> Decimal p r
 flipSign n = n { sign = negateSign (sign n) }
 
--- | Cast a 'Number' to another precision and/or rounding algorithm,
+-- | Cast a 'Decimal' to another precision and/or rounding algorithm,
 -- immediately rounding if necessary to the new precision using the new
 -- algorithm.
-cast :: (Precision p, Rounding r) => Number a b -> Number p r
+cast :: (Precision p, Rounding r) => Decimal a b -> Decimal p r
 cast = numberOp . round . coerce
 
 -- | Return the number of decimal digits of the argument.
@@ -428,36 +429,36 @@ numDigits x
 maxCoefficient :: Precision p => p -> Maybe Coefficient
 maxCoefficient p = (\d -> 10 ^ d - 1) <$> precision p
 
--- | Is the sign of the given 'Number' positive?
-isPositive :: Number p r -> Bool
+-- | Is the sign of the given 'Decimal' positive?
+isPositive :: Decimal p r -> Bool
 isPositive n = case sign n of
   Pos -> True
   Neg -> False
 
--- | Is the sign of the given 'Number' negative?
-isNegative :: Number p r -> Bool
+-- | Is the sign of the given 'Decimal' negative?
+isNegative :: Decimal p r -> Bool
 isNegative n = case sign n of
   Neg -> True
   Pos -> False
 
--- | Does the given 'Number' represent a finite value?
-isFinite :: Number p r -> Bool
+-- | Does the given 'Decimal' represent a finite value?
+isFinite :: Decimal p r -> Bool
 isFinite Num{} = True
 isFinite _     = False
 
--- | Does the given 'Number' represent the value zero?
-isZero :: Number p r -> Bool
+-- | Does the given 'Decimal' represent the value zero?
+isZero :: Decimal p r -> Bool
 isZero Num { coefficient = 0 } = True
 isZero _                       = False
 
--- | Is the given 'Number' normal?
-isNormal :: Precision p => Number p r -> Bool
+-- | Is the given 'Decimal' normal?
+isNormal :: Precision p => Decimal p r -> Bool
 isNormal n
   | isFinite n && not (isZero n) = maybe True (adjustedExponent n >=) (eMin n)
   | otherwise                    = False
 
--- | Is the given 'Number' subnormal?
-isSubnormal :: Precision p => Number p r -> Bool
+-- | Is the given 'Decimal' subnormal?
+isSubnormal :: Precision p => Decimal p r -> Bool
 isSubnormal n
   | isFinite n && not (isZero n) = maybe False (adjustedExponent n <) (eMin n)
   | otherwise                    = False
@@ -481,7 +482,7 @@ eTiny :: Precision p => p -> Maybe Exponent
 eTiny n = (-) <$> eMin n <*> (fromIntegral . subtract 1 <$> precision n)
 
 -- | Range of permissible exponent values
-eRange :: Precision p => Number p r -> Maybe (Exponent, Exponent)
+eRange :: Precision p => Decimal p r -> Maybe (Exponent, Exponent)
 eRange n@Num { coefficient = c } = range <$> eLimit n
   where range :: Exponent -> (Exponent, Exponent)
         range lim = (-lim - clm1 + 1, lim - clm1)
@@ -489,7 +490,7 @@ eRange n@Num { coefficient = c } = range <$> eLimit n
         clm1 = fromIntegral (clength - 1) :: Exponent
 eRange _ = Nothing
 
-adjustedExponent :: Number p r -> Exponent
+adjustedExponent :: Decimal p r -> Exponent
 adjustedExponent Num { coefficient = c, exponent = e } =
   e + fromIntegral (clength - 1)
   where clength = numDigits c :: Int
