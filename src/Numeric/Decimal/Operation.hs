@@ -187,8 +187,7 @@ divide dividend@Num{ sign = xs } Num { coefficient = 0, sign = ys }
   | otherwise       = raiseSignal DivisionByZero
                         infinity { sign = xorSigns xs ys }
 divide Num { sign = xs, coefficient = xc, exponent = xe }
-       Num { sign = ys, coefficient = yc, exponent = ye } =
-  quotient
+       Num { sign = ys, coefficient = yc, exponent = ye } = quotient
 
   where quotient = result =<< answer
         rn = Num { sign = rs, coefficient = rc, exponent = re }
@@ -244,26 +243,34 @@ divide x y = return (toQNaN2 x y)
 type Dividend  = Coefficient
 type Divisor   = Coefficient
 type Quotient  = Coefficient
-type Remainder = Coefficient
+type Remainder = Dividend
 
 longDivision :: Dividend -> Divisor -> Int
              -> (Quotient, Remainder, Divisor, Exponent)
 longDivision 0  dv _ = (0, 0, dv, 0)
 longDivision dd dv p = step1 dd dv 0
 
-  where step1 dd dv adjust
+  where step1 :: Dividend -> Divisor -> Exponent
+              -> (Quotient, Remainder, Divisor, Exponent)
+        step1 dd dv adjust
           | dd <       dv = step1 (dd * 10)  dv       (adjust + 1)
           | dd >= 10 * dv = step1  dd       (dv * 10) (adjust - 1)
           | otherwise     = step2  dd        dv        adjust
 
+        step2 :: Dividend -> Divisor -> Exponent
+              -> (Quotient, Remainder, Divisor, Exponent)
         step2 = step3 0
 
+        step3 :: Quotient -> Dividend -> Divisor -> Exponent
+              -> (Quotient, Remainder, Divisor, Exponent)
         step3 r dd dv adjust
           | dv <= dd                 = step3 (r +  1) (dd - dv) dv  adjust
           | (dd == 0 && adjust >= 0) ||
             numDigits r == p         = step4  r        dd       dv  adjust
           | otherwise                = step3 (r * 10) (dd * 10) dv (adjust + 1)
 
+        step4 :: Quotient -> Remainder -> Divisor -> Exponent
+              -> (Quotient, Remainder, Divisor, Exponent)
         step4 = (,,,)
 
 -- | If the operand is negative, the result is the same as using the 'minus'

@@ -155,11 +155,14 @@ runArith (Arith e) = runState (runExceptT e)
 evalArith :: Arith p r a -> Context p r -> Either (Exception p r) a
 evalArith (Arith e) = evalState (runExceptT e)
 
--- $exceptional-conditions
---
--- Exceptional conditions are grouped into signals, which can be controlled
--- individually. A 'Context' contains a flag and a trap enabler (i.e. enabled
--- or disabled) for each 'Signal'.
+{- $exceptional-conditions
+
+Exceptional conditions are grouped into signals, which can be controlled
+individually. A 'Context' contains a flag and a trap enabler (i.e. enabled or
+disabled) for each 'Signal'.
+
+-}
+
 
 data Signal
   = Clamped

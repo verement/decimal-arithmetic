@@ -305,7 +305,7 @@ instance (FinitePrecision p, Rounding r) => Floating (Number p r) where
   atanh = notyet "atanh"
 
 {- $doctest-Floating
-prop> realToFrac (pi :: Double) == (pi :: ExtendedDecimal P16)
+prop> realToFrac (pi :: ExtendedDecimal P16) == (pi :: Double)
 -}
 
 instance (FinitePrecision p, Rounding r) => RealFloat (Number p r) where
@@ -325,16 +325,17 @@ instance (FinitePrecision p, Rounding r) => RealFloat (Number p r) where
           special s v = signFunc s (pp + fromIntegral v)
 
   encodeFloat m n = x
-    where x | abs m >= pp = special
-            | otherwise   = cast Num { sign        = signMatch m
-                                     , coefficient = fromInteger (abs m)
-                                     , exponent    = fromIntegral n
-                                     }
+    where x | am >= pp  = special
+            | otherwise = cast Num { sign        = signMatch m
+                                   , coefficient = fromInteger am
+                                   , exponent    = fromIntegral n
+                                   }
           special
             | n == maxBound     = Inf  { sign = signMatch m }
             | n == minBound     = QNaN { sign = signMatch m, payload = p }
             | otherwise         = SNaN { sign = signMatch m, payload = p }
-            where p = fromInteger (abs m - pp)
+            where p = fromInteger (am - pp)
+          am = abs m              :: Integer
           pp = 10 ^ floatDigits x :: Integer
 
   isNaN x = case x of
@@ -452,33 +453,31 @@ isZero _                       = False
 -- | Is the given 'Number' normal?
 isNormal :: Precision p => Number p r -> Bool
 isNormal n
-  | isFinite n && not (isZero n) &&
-    maybe True (adjustedExponent n >=) (eMin n) = True
-  | otherwise                                   = False
+  | isFinite n && not (isZero n) = maybe True (adjustedExponent n >=) (eMin n)
+  | otherwise                    = False
 
 -- | Is the given 'Number' subnormal?
 isSubnormal :: Precision p => Number p r -> Bool
 isSubnormal n
-  | isFinite n && not (isZero n) &&
-    maybe False (adjustedExponent n <) (eMin n) = True
-  | otherwise                                   = False
+  | isFinite n && not (isZero n) = maybe False (adjustedExponent n <) (eMin n)
+  | otherwise                    = False
 
 -- | Upper limit on the absolute value of the exponent
-eLimit :: Precision p => Number p r -> Maybe Exponent
-eLimit = eMax
+eLimit :: Precision p => p -> Maybe Exponent
+eLimit = eMax -- ?
 
 -- | Minimum value of the adjusted exponent
-eMin :: Precision p => Number p r -> Maybe Exponent
+eMin :: Precision p => p -> Maybe Exponent
 eMin n = (1 -) <$> eMax n
 
 -- | Maximum value of the adjusted exponent
-eMax :: Precision p => Number p r -> Maybe Exponent
+eMax :: Precision p => p -> Maybe Exponent
 eMax n = subtract 1 . (10 ^) . numDigits <$> base
   where mlength = precision n                    :: Maybe Int
-        base = (10 *) . fromIntegral <$> mlength :: Maybe Natural
+        base = (10 *) . fromIntegral <$> mlength :: Maybe Coefficient
 
 -- | Minimum value of the exponent for subnormal results
-eTiny :: Precision p => Number p r -> Maybe Exponent
+eTiny :: Precision p => p -> Maybe Exponent
 eTiny n = (-) <$> eMin n <*> (fromIntegral . subtract 1 <$> precision n)
 
 -- | Range of permissible exponent values
