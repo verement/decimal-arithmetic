@@ -136,7 +136,7 @@ instance Monad (Arith p r) where
     where g x = let Arith t = f x in t
 
 instance MonadError (Exception p r) (Arith p r) where
-  throwError e = Arith (throwError e)
+  throwError = Arith . throwError
   catchError (Arith e) f = Arith (catchError e g)
     where g x = let Arith t = f x in t
 

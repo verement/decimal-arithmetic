@@ -109,19 +109,15 @@ excessDigits _ = return Nothing
 rounded :: (Coefficient -> Coefficient -> Coefficient ->
             Decimal p r -> Decimal p r -> Decimal p r)
         -> Int -> Decimal p r -> Arith p r (Decimal p r)
-rounded f d n = raiseSignal Rounded =<< rounded'
+rounded f d n = raiseSignal Rounded =<< rounded' n'
   where rounded'
-          | r /= 0    = raiseSignal Inexact n'
-          | otherwise = return n'
+          | r /= 0    = raiseSignal Inexact
+          | otherwise = return
         p = 10 ^ d
         (q, r) = coefficient n `quotRem` p
         n' = f (p `quot` 2) q r down up
-        down = n { coefficient = q
-                 , exponent = exponent n + fromIntegral d
-                 }
-        up = n { coefficient = q + 1
-               , exponent = exponent n + fromIntegral d
-               }
+        down = n { coefficient = q    , exponent = exponent n + fromIntegral d }
+        up   = n { coefficient = q + 1, exponent = exponent n + fromIntegral d }
 
 roundDown :: Precision p => Decimal p r -> Arith p r (Decimal p r)
 roundDown n = excessDigits n >>= roundDown'

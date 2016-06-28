@@ -290,9 +290,9 @@ toNumber = parseSign flipSign <*> parseNumericString
                   char '.'
                   fracDigits <- many parseDigit
                   return $ \e ->
-                    Num { sign = Pos
+                    Num { sign        = Pos
                         , coefficient = readDigits (digits ++ fracDigits)
-                        , exponent = e - fromIntegral (length fracDigits)
+                        , exponent    = e - fromIntegral (length fracDigits)
                         }
 
                 digitsWithOptionalPoint = fractionalDigits <|> wholeDigits
@@ -301,16 +301,16 @@ toNumber = parseSign flipSign <*> parseNumericString
                   char '.'
                   fracDigits <- many1 parseDigit
                   return $ \e ->
-                    Num { sign = Pos
+                    Num { sign        = Pos
                         , coefficient = readDigits fracDigits
-                        , exponent = e - fromIntegral (length fracDigits)
+                        , exponent    = e - fromIntegral (length fracDigits)
                         }
 
                 wholeDigits = do
                   digits <- many1 parseDigit
-                  return $ \e -> Num { sign = Pos
+                  return $ \e -> Num { sign        = Pos
                                      , coefficient = readDigits digits
-                                     , exponent = e
+                                     , exponent    = e
                                      }
 
         parseExponentPart :: ReadP Exponent

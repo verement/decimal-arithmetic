@@ -113,38 +113,38 @@ instance Precision p => Precision (Decimal p r) where
     where decimalPrecision :: Decimal p r -> p
           decimalPrecision = undefined
 
-numberOp :: (Precision p, Rounding r) => Arith p r (Decimal p r) -> Decimal p r
-numberOp op = either exceptionResult id $ evalArith op newContext
+evalOp :: (Precision p, Rounding r) => Arith p r (Decimal p r) -> Decimal p r
+evalOp op = either exceptionResult id $ evalArith op newContext
 
 type GeneralDecimal = Decimal PInfinite RoundHalfEven
 
 instance Eq (Decimal p r) where
-  x == y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
+  x == y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
     Num { coefficient = 0 } -> True
     _                       -> False
 
 instance Ord (Decimal p r) where
-  x `compare` y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
+  x `compare` y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
     Num { coefficient = 0 } -> EQ
     Num { sign = Neg      } -> LT
     Num { sign = Pos      } -> GT
     _                       -> GT  -- match Prelude behavior for NaN
 
-  x < y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
+  x < y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
     Num { sign = Neg      } -> True
     _                       -> False
 
-  x <= y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
+  x <= y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
     Num { sign = Neg      } -> True
     Num { coefficient = 0 } -> True
     _                       -> False
 
-  x > y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
+  x > y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
     Num { coefficient = 0 } -> False
     Num { sign = Pos      } -> True
     _                       -> False
 
-  x >= y = case numberOp (x `Op.compare` y) :: GeneralDecimal of
+  x >= y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
     Num { sign = Pos      } -> True
     _                       -> False
 
@@ -165,8 +165,8 @@ instance Ord (Decimal p r) where
     | otherwise = y
 
 instance (Precision p, Rounding r) => Enum (Decimal p r) where
-  succ x = numberOp (x `Op.add`      one)
-  pred x = numberOp (x `Op.subtract` one)
+  succ x = evalOp (x `Op.add`      one)
+  pred x = evalOp (x `Op.subtract` one)
 
   toEnum = fromIntegral
 
@@ -178,11 +178,11 @@ instance (Precision p, Rounding r) => Enum (Decimal p r) where
   enumFrom       x     = enumFromWith x one
   enumFromThen   x y   = let i = y - x
                          in x : enumFromWith y i
-  enumFromTo     x   e = takeWhile (<= e) $ enumFromWith x one
-  enumFromThenTo x y e = let i = y - x
+  enumFromTo     x   z = takeWhile (<= z) $ enumFromWith x one
+  enumFromThenTo x y z = let i = y - x
                              cmp | i < 0     = (>=)
                                  | otherwise = (<=)
-                         in takeWhile (`cmp` e) $ x : enumFromWith y i
+                         in takeWhile (`cmp` z) $ x : enumFromWith y i
 
 enumFromWith :: (Precision p, Rounding r)
              => Decimal p r -> Decimal p r -> [Decimal p r]
@@ -200,12 +200,12 @@ enumFromWith x i = x : enumFromWith (x + i) i
 -}
 
 instance (Precision p, Rounding r) => Num (Decimal p r) where
-  x + y = numberOp (x `Op.add`      y)
-  x - y = numberOp (x `Op.subtract` y)
-  x * y = numberOp (x `Op.multiply` y)
+  x + y = evalOp (x `Op.add`      y)
+  x - y = evalOp (x `Op.subtract` y)
+  x * y = evalOp (x `Op.multiply` y)
 
-  negate = numberOp . Op.minus
-  abs    = numberOp . Op.abs
+  negate = evalOp . Op.minus
+  abs    = evalOp . Op.abs
 
   signum n = case n of
     Num { coefficient = 0 } -> zero
@@ -237,7 +237,7 @@ instance (Precision p, Rounding r) => Real (Decimal p r) where
     _     -> GHC.Real.notANumber
 
 instance (FinitePrecision p, Rounding r) => Fractional (Decimal p r) where
-  x / y = numberOp (x `Op.divide` y)
+  x / y = evalOp (x `Op.divide` y)
   fromRational r = fromInteger (numerator r) / fromInteger (denominator r)
 
 instance (FinitePrecision p, Rounding r) => RealFrac (Decimal p r) where
@@ -286,7 +286,7 @@ castDown :: (Precision p, Rounding r)
 castDown = cast
 
 notyet :: String -> a
-notyet s = error (s ++ ": not yet implemented")
+notyet = error . (++ ": not yet implemented")
 
 instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   pi = castDown seriesPi
@@ -321,9 +321,9 @@ instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
     Inf  { sign = s              } -> (special s 0, maxBound    )
     QNaN { sign = s, payload = p } -> (special s p, minBound    )
     SNaN { sign = s, payload = p } -> (special s p, minBound + 1)
-    where pp = 10 ^ floatDigits x :: Integer
-          special :: Sign -> Coefficient -> Integer
+    where special :: Sign -> Coefficient -> Integer
           special s v = signFunc s (pp + fromIntegral v)
+          pp = 10 ^ floatDigits x :: Integer
 
   encodeFloat m n = x
     where x | am >= pp  = special
@@ -410,7 +410,7 @@ flipSign n = n { sign = negateSign (sign n) }
 -- immediately rounding if necessary to the new precision using the new
 -- algorithm.
 cast :: (Precision p, Rounding r) => Decimal a b -> Decimal p r
-cast = numberOp . round . coerce
+cast = evalOp . round . coerce
 
 -- | Return the number of decimal digits of the argument.
 numDigits :: Coefficient -> Int
