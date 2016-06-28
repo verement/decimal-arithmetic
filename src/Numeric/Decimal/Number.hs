@@ -238,7 +238,19 @@ instance (Precision p, Rounding r) => Real (Decimal p r) where
 
 instance (FinitePrecision p, Rounding r) => Fractional (Decimal p r) where
   x / y = evalOp (x `Op.divide` y)
-  fromRational r = fromInteger (numerator r) / fromInteger (denominator r)
+  fromRational r = let n = fromInteger (numerator   r) :: GeneralDecimal
+                       d = fromInteger (denominator r) :: GeneralDecimal
+                   in coerce n / coerce d
+
+{- $doctest-Fractional
+prop> (4.14 :: Decimal P2 RoundHalfUp)   == 4.1
+prop> (4.15 :: Decimal P2 RoundHalfUp)   == 4.2
+prop> (4.15 :: Decimal P2 RoundHalfDown) == 4.1
+prop> (4.15 :: Decimal P2 RoundHalfEven) == 4.2
+prop> (4.25 :: Decimal P2 RoundHalfEven) == 4.2
+prop> (4.35 :: Decimal P2 RoundHalfEven) == 4.4
+prop> (4.45 :: Decimal P2 RoundHalfEven) == 4.4
+-}
 
 instance (FinitePrecision p, Rounding r) => RealFrac (Decimal p r) where
   properFraction x@Num { sign = s, coefficient = c, exponent = e }
