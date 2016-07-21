@@ -1,7 +1,5 @@
 -*- Outline -*-
 
 * To Do
-** Test suite
 ** instance Floating (Decimal p r)
-** instance RealFloat (Decimal p r)
 ** instance PrintfArg (Decimal p r)

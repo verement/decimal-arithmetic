@@ -20,6 +20,7 @@ module Numeric.Decimal.Number
 
        , flipSign
        , cast
+       , toBool
 
        , isPositive
        , isNegative
@@ -50,8 +51,9 @@ import qualified GHC.Real
 >>> :load Harness
 -}
 
-data Sign = Pos | Neg
-          deriving (Eq, Enum, Show)
+data Sign = Pos  -- ^ Positive or non-negative
+          | Neg  -- ^ Negative
+          deriving (Eq, Enum)
 
 negateSign :: Sign -> Sign
 negateSign Pos = Neg
@@ -123,7 +125,7 @@ instance Eq (Decimal p r) where
     Num { coefficient = 0 } -> True
     _                       -> False
 
-instance Ord (Decimal p r) where
+instance (Precision p, Rounding r) => Ord (Decimal p r) where
   x `compare` y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
     Num { coefficient = 0 } -> EQ
     Num { sign = Neg      } -> LT
@@ -148,21 +150,18 @@ instance Ord (Decimal p r) where
     Num { sign = Pos      } -> True
     _                       -> False
 
-  max nan@SNaN{} _ = nan
-  max _ nan@SNaN{} = nan
-  max nan@QNaN{} _ = nan
-  max _ nan@QNaN{} = nan
-  max x y
-    | x >= y    = x
-    | otherwise = y
+  max x y = evalOp (Op.max x y)
+  min x y = evalOp (Op.min x y)
 
-  min nan@SNaN{} _ = nan
-  min _ nan@SNaN{} = nan
-  min nan@QNaN{} _ = nan
-  min _ nan@QNaN{} = nan
-  min x y
-    | x < y     = x
-    | otherwise = y
+{- $doctest-Ord
+prop> x > y ==> max x y == x && max y x == (x :: BasicDecimal)
+prop> x < y ==> min x y == x && min y x == (x :: BasicDecimal)
+
+prop> max x y == x ==> x >= y
+prop> max x y == y ==> y >= x
+prop> min x y == x ==> x <= y
+prop> min x y == y ==> y <= x
+-}
 
 instance (Precision p, Rounding r) => Enum (Decimal p r) where
   succ x = evalOp (x `Op.add`      one)
@@ -474,6 +473,14 @@ isSubnormal :: Precision p => Decimal p r -> Bool
 isSubnormal n
   | isFinite n && not (isZero n) = maybe False (adjustedExponent n <) (eMin n)
   | otherwise                    = False
+
+-- | Return 'False' if the argument is zero or NaN, and 'True' otherwise.
+toBool :: Decimal p r -> Bool
+toBool Num { coefficient = c }
+  | c == 0    = False
+  | otherwise = True
+toBool Inf{}  = True
+toBool _      = False
 
 -- | Upper limit on the absolute value of the exponent
 eLimit :: Precision p => p -> Maybe Exponent

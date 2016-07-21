@@ -8,9 +8,11 @@ module Numeric.Decimal.Operation
        , minus
        , abs
        , compare
+       , min
+       , max
        ) where
 
-import Prelude hiding (abs, compare, subtract)
+import Prelude hiding (abs, compare, max, min, subtract)
 
 import {-# SOURCE #-} Numeric.Decimal.Arithmetic
 import {-# SOURCE #-} Numeric.Decimal.Number
@@ -31,3 +33,7 @@ abs      :: (Precision p, Rounding r)
          => Decimal a b -> Arith p r (Decimal p r)
 compare  :: (Precision p, Rounding r)
          => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+min      :: (Precision p, Rounding r)
+         => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
+max      :: (Precision p, Rounding r)
+         => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)

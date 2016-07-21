@@ -18,6 +18,22 @@ Unlike the binary floating-point types 'Float' and 'Double', decimal number
 types can perform decimal arithmetic exactly. Internally, decimal numbers are
 represented with an integral coefficient and base-10 exponent.
 
+@
+@>>>@ __29.99 + 4.71 :: Double__
+34.699999999999996
+@
+
+>>> 29.99 + 4.71 :: BasicDecimal
+34.70
+
+@
+@>>>@ __0.1 + 0.2 == (0.3 :: Double)__
+False
+@
+
+>>> 0.1 + 0.2 == (0.3 :: BasicDecimal)
+True
+
 Decimal numbers support lossless conversion to and from a string
 representation via 'Show' and 'Read' instances. Note that there may be
 multiple representations of values that are numerically equal (e.g. 1 and
@@ -50,6 +66,7 @@ module Numeric.Decimal
 
          -- * Functions
        , cast
+       , toBool
        ) where
 
 import Numeric.Decimal.Number
@@ -77,8 +94,9 @@ rounds half up.
 
 * 'ExtendedDecimal' is a number type constructor with selectable precision
 that rounds half even. For example, @'ExtendedDecimal' 'P34'@ is a number type
-with 34 decimal digits of precision. There are a range of ready-made
-precisions available, including 'P1' through 'P50' on up to 'P2000'.
+with 34 decimal digits of precision. There is a range of ready-made precisions
+available, including 'P1' through 'P50' on up to 'P2000' (the IEEE 754
+smallest and basic formats correspond to precisions 'P7', 'P16', or 'P34').
 Alternatively, an arbitrary precision can be constructed through type
 application of 'PPlus1' and/or 'PTimes2' to any existing precision.
 
@@ -96,7 +114,7 @@ in your application. For example:
 > type Number = ExtendedDecimal P16
 
 A decimal number type may be used in a @default@ declaration, possibly
-replacing 'Double' or 'Integer'. For example:
+replacing 'Double' and/or 'Integer'. For example:
 
 > default (Integer, BasicDecimal)
 

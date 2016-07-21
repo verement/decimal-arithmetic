@@ -43,13 +43,18 @@ read' p str = case [ x | (x, "") <- readP_to_S p str ] of
   [x] -> x
   _   -> error "read failed"
 
+exceptionError :: Exception p r -> a
+exceptionError = error . show . exceptionSignal
 
-op1 :: (BasicDecimal -> Arith P9 RoundHalfUp BasicDecimal)
-    -> String -> BasicDecimal
-op1 op x = either exceptionResult id $ evalArith arith newContext
+type BasicArith = Arith P9 RoundHalfUp
+
+op0 :: BasicArith a -> a
+op0 op = either exceptionError id $ evalArith op newContext
+
+op1 :: (BasicDecimal -> BasicArith a) -> String -> a
+op1 op x = either exceptionError id $ evalArith arith newContext
   where arith = op (read x)
 
-op2 :: (BasicDecimal -> BasicDecimal -> Arith P9 RoundHalfUp BasicDecimal)
-    -> String -> String -> BasicDecimal
-op2 op x y = either exceptionResult id $ evalArith arith newContext
-  where arith = op (read x) (read y)
+op2 :: (BasicDecimal -> BasicDecimal -> BasicArith a) -> String -> String -> a
+op2 op x y = either exceptionError id $ evalArith arith newContext
+  where arith = read x `op` read y

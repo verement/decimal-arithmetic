@@ -7,7 +7,7 @@
 -- arithmetic computation.
 
 module Numeric.Decimal.Arithmetic
-       ( -- *Decimal arithmetic
+       ( -- * Decimal arithmetic
          -- $decimal-arithmetic
 
          -- ** Context
@@ -36,23 +36,19 @@ module Numeric.Decimal.Arithmetic
        , Signals
        , signal
        , signals
-       , testSignal
+       , signalMember
 
        , raiseSignal
        , clearFlags
 
          -- ** Traps
        , TrapHandler
-       , setTrapHandler
-       , enableTraps
-       , disableTraps
-       , withTraps
-       , withoutTraps
+       , trap
        ) where
 
 import Control.Monad.Except (MonadError(throwError, catchError),
                              ExceptT, runExceptT)
-import Control.Monad.State (MonadState(get, put), modify,
+import Control.Monad.State (MonadState(get, put), modify, gets,
                             State, runState, evalState)
 import Data.Bits (bit, complement, testBit, (.&.), (.|.))
 import Data.Monoid ((<>))
@@ -74,19 +70,14 @@ import Numeric.Decimal.Rounding
 data Context p r =
   Context { flags        :: Signals
                             -- ^ The current signal flags of the context
-          , trapEnablers :: Signals
-                            -- ^ The current trap enablers of the context
           , trapHandler  :: TrapHandler p r
                             -- ^ The trap handler function for the context
           }
 
--- | Return a new context with all signal flags cleared, all traps disabled,
--- and a trap handler that calls 'throwError' on all exceptional conditions
--- (when enabled).
+-- | Return a new context with all signal flags cleared and all traps disabled.
 newContext :: Context p r
-newContext = Context { flags        = mempty
-                     , trapEnablers = mempty
-                     , trapHandler  = throwError
+newContext = Context { flags       = mempty
+                     , trapHandler = return . exceptionResult
                      }
 
 -- $default-contexts
@@ -97,14 +88,20 @@ newContext = Context { flags        = mempty
 
 -- | Return a new context with all signal flags cleared, all traps enabled
 -- except for 'Inexact', 'Rounded', and 'Subnormal', using a precision of 9
--- significant decimal digits, and rounding half up.
+-- significant decimal digits, and rounding half up. Trapped signals simply
+-- call 'throwError' with the corresponding 'Exception', and can be caught
+-- using 'catchError'.
 basicDefaultContext :: Context P9 RoundHalfUp
-basicDefaultContext = newContext { trapEnablers = traps }
-  where traps = signals $ filter (`notElem` [Inexact, Rounded, Subnormal])
-          [minBound..maxBound]
+basicDefaultContext = newContext { trapHandler = handler }
+  where handler e
+          | exceptionSignal e `notElem` disabled = throwError e
+          | otherwise                            = trapHandler newContext e
+        disabled = [Inexact, Rounded, Subnormal]
 
--- | Return a new context with all signal flags cleared, all traps disabled,
--- using selectable precision, and rounding half even.
+-- | Return a new context with all signal flags cleared, all traps disabled
+-- (IEEE 854 §7), using selectable precision (the IEEE 754 smallest and basic
+-- formats correspond to precisions 'P7', 'P16', or 'P34'), and rounding half
+-- even (IEEE 754 §4.3.3).
 extendedDefaultContext :: Context p RoundHalfEven
 extendedDefaultContext = newContext
 
@@ -155,14 +152,11 @@ runArith (Arith e) = runState (runExceptT e)
 evalArith :: Arith p r a -> Context p r -> Either (Exception p r) a
 evalArith (Arith e) = evalState (runExceptT e)
 
-{- $exceptional-conditions
-
-Exceptional conditions are grouped into signals, which can be controlled
-individually. A 'Context' contains a flag and a trap enabler (i.e. enabled or
-disabled) for each 'Signal'.
-
--}
-
+-- $exceptional-conditions
+--
+-- Exceptional conditions are grouped into signals, which can be controlled
+-- individually. A 'Context' contains a flag and a trap enabler (i.e. enabled
+-- or disabled) for each 'Signal'.
 
 data Signal
   = Clamped
@@ -209,15 +203,15 @@ signals = mconcat . map signal
 
 -- | Enumerate the given set of signals.
 signalList :: Signals -> [Signal]
-signalList sigs = filter (`testSignal` sigs) [minBound..maxBound]
+signalList sigs = filter (`signalMember` sigs) [minBound..maxBound]
 
 -- | Remove the first set of signals from the second.
 unsignal :: Signals -> Signals -> Signals
 unsignal (Signals u) (Signals ss) = Signals (ss .&. complement u)
 
 -- | Determine whether a signal is a member of a set.
-testSignal :: Signal -> Signals -> Bool
-testSignal sig (Signals ss) = testBit ss (fromEnum sig)
+signalMember :: Signal -> Signals -> Bool
+signalMember sig (Signals ss) = testBit ss (fromEnum sig)
 
 -- | Set the given signal flag in the context of the current arithmetic
 -- computation, and call the trap handler if the trap for this signal is
@@ -227,9 +221,7 @@ raiseSignal sig n = do
   ctx <- get
   let ctx' = ctx { flags = flags ctx <> signal sig }
   put ctx'
-  if testSignal sig (trapEnablers ctx')
-    then trapHandler ctx' (Exception sig n)
-    else return n
+  trapHandler ctx' (Exception sig n)
 
 -- | Clear the given signal flags from the context of the current arithmetic
 -- computation.
@@ -238,49 +230,35 @@ clearFlags sigs = modify $ \ctx -> ctx { flags = unsignal sigs (flags ctx) }
 
 -- | A trap handler function may return a substitute result for the operation
 -- that caused the exceptional condition, or it may call 'throwError' to abort
--- the arithmetic computation (or pass control to an appropriate 'catchError'
+-- the arithmetic computation (or pass control to an enclosing 'catchError'
 -- handler).
---
--- Care should be taken not to cause additional traps that might result in an
--- infinite loop.
 type TrapHandler p r = Exception p r -> Arith p r (Decimal p r)
 
--- | Set the trap handler function for the context of the current arithmetic
--- computation. The handler will be called whenever a signal is raised for
--- which the corresponding trap is also enabled.
-setTrapHandler :: TrapHandler p r -> Arith p r ()
-setTrapHandler handler = modify $ \ctx -> ctx { trapHandler = handler }
+-- | Evaluate an arithmetic computation within a modified context that enables
+-- the given signals to be trapped by the given handler. The previous trap
+-- handler (and enabler state) will be restored during any trap, as well as
+-- upon completion. Any existing trap handlers for signals not mentioned
+-- remain in effect.
+trap :: Signals -> TrapHandler p r -> Arith p r a -> Arith p r a
+trap sigs handler arith = do
+  origHandler <- gets trapHandler
 
--- | Enable traps for all of the given signals.
-enableTraps :: Signals -> Arith p r ()
-enableTraps sigs = modify $ \ctx ->
-  ctx { trapEnablers = trapEnablers ctx <> sigs }
+  let newHandler e = wrapHandler origHandler $
+        if exceptionSignal e `signalMember` sigs
+        then handler e
+        else origHandler e
 
--- | Disable traps for all of the given signals.
-disableTraps :: Signals -> Arith p r ()
-disableTraps sigs = modify $ \ctx ->
-  ctx { trapEnablers = unsignal sigs (trapEnablers ctx) }
+  wrapHandler newHandler arith `catchError` \e -> do
+    setHandler origHandler
+    throwError e
 
--- | Perform an arithmetic computation with a locally modified set of trap
--- enablers. The former trap enablers are restored after the computation is
--- completed.
-localTraps :: (Signals -> Signals) -> Arith p r a -> Arith p r a
-localTraps f comp = do
-  ctx <- get
-  let enablers = trapEnablers ctx
-  put ctx { trapEnablers = f enablers }
-  r <- comp
-  put ctx { trapEnablers = enablers }
-  return r
+  where wrapHandler :: TrapHandler p r -> Arith p r a -> Arith p r a
+        wrapHandler handler arith = do
+          prevHandler <- gets trapHandler
+          setHandler handler
+          r <- arith
+          setHandler prevHandler
+          return r
 
--- | Enable traps for all of the given signals for the duration of the passed
--- arithmetic computation. The set of trap enablers is restored after the
--- computation is completed.
-withTraps :: Signals -> Arith p r a -> Arith p r a
-withTraps sigs = localTraps (<> sigs)
-
--- | Disable traps for all of the given signals for the duration of the passed
--- arithmetic computation. The set of trap enablers is restored after the
--- computation is completed.
-withoutTraps :: Signals -> Arith p r a -> Arith p r a
-withoutTraps sigs = localTraps (unsignal sigs)
+        setHandler :: TrapHandler p r -> Arith p r ()
+        setHandler handler = modify $ \ctx -> ctx { trapHandler = handler }
