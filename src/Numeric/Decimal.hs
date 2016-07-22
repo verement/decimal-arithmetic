@@ -66,7 +66,7 @@ module Numeric.Decimal
 
          -- * Functions
        , cast
-       , toBool
+       , fromBool
        ) where
 
 import Numeric.Decimal.Number

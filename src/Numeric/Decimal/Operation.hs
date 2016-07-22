@@ -622,6 +622,12 @@ reduce n = reduce' <$> plus n
 -- This section describes miscellaneous operations on decimal numbers,
 -- including non-numeric comparisons, sign and other manipulations, and
 -- logical operations.
+--
+-- Some operations return a boolean value that is described as 0 or 1 in the
+-- documentation below. For reasons of efficiency, and as permitted by the
+-- /General Decimal Arithmetic Specification/, these operations return a
+-- 'Bool' in this implementation, but can be converted to 'Decimal' via
+-- 'fromBool'.
 
 -- | 'canonical' takes one operand. The result has the same value as the
 -- operand but always uses a /canonical/ encoding. The definition of
@@ -801,11 +807,11 @@ copySign n m = return n { sign = sign m }
 -- If all possible operands have just one internal encoding each, then
 -- 'isCanonical' always returns 1. This operation is unaffected by context and
 -- is quiet – no /flags/ are changed in the context.
-isCanonical :: Decimal a b -> Arith p r (Decimal p r)
-isCanonical _ = return one
+isCanonical :: Decimal a b -> Arith p r Bool
+isCanonical _ = return True
 
 {- $doctest-isCanonical
->>> op1 Op.isCanonical "2.50"
+>>> fromBool $ op1 Op.isCanonical "2.50"
 1
 -}
 
@@ -813,190 +819,182 @@ isCanonical _ = return one
 -- infinite nor a NaN (that is, it is a normal number, a subnormal number, or
 -- a zero); otherwise it is 0. This operation is unaffected by context and is
 -- quiet – no /flags/ are changed in the context.
-isFinite :: Decimal a b -> Arith p r (Decimal p r)
-isFinite n = return $ case n of
-  Num{} -> one
-  _     -> zero
+isFinite :: Decimal a b -> Arith p r Bool
+isFinite = return . Number.isFinite
 
 {- $doctest-isFinite
->>> op1 Op.isFinite "2.50"
+>>> fromBool $ op1 Op.isFinite "2.50"
 1
 
->>> op1 Op.isFinite "-0.3"
+>>> fromBool $ op1 Op.isFinite "-0.3"
 1
 
->>> op1 Op.isFinite "0"
+>>> fromBool $ op1 Op.isFinite "0"
 1
 
->>> op1 Op.isFinite "Inf"
+>>> fromBool $ op1 Op.isFinite "Inf"
 0
 
->>> op1 Op.isFinite "NaN"
+>>> fromBool $ op1 Op.isFinite "NaN"
 0
 -}
 
 -- | 'isInfinite' takes one operand. The result is 1 if the operand is an
 -- Infinity; otherwise it is 0. This operation is unaffected by context and is
 -- quiet – no /flags/ are changed in the context.
-isInfinite :: Decimal a b -> Arith p r (Decimal p r)
+isInfinite :: Decimal a b -> Arith p r Bool
 isInfinite n = return $ case n of
-  Inf{} -> one
-  _     -> zero
+  Inf{} -> True
+  _     -> False
 
 {- $doctest-isInfinite
->>> op1 Op.isInfinite "2.50"
+>>> fromBool $ op1 Op.isInfinite "2.50"
 0
 
->>> op1 Op.isInfinite "-Inf"
+>>> fromBool $ op1 Op.isInfinite "-Inf"
 1
 
->>> op1 Op.isInfinite "NaN"
+>>> fromBool $ op1 Op.isInfinite "NaN"
 0
 -}
 
 -- | 'isNaN' takes one operand. The result is 1 if the operand is a NaN (quiet
 -- or signaling); otherwise it is 0. This operation is unaffected by context
 -- and is quiet – no /flags/ are changed in the context.
-isNaN :: Decimal a b -> Arith p r (Decimal p r)
+isNaN :: Decimal a b -> Arith p r Bool
 isNaN n = return $ case n of
-  QNaN{} -> one
-  SNaN{} -> one
-  _      -> zero
+  QNaN{} -> True
+  SNaN{} -> True
+  _      -> False
 
 {- $doctest-isNaN
->>> op1 Op.isNaN "2.50"
+>>> fromBool $ op1 Op.isNaN "2.50"
 0
 
->>> op1 Op.isNaN "NaN"
+>>> fromBool $ op1 Op.isNaN "NaN"
 1
 
->>> op1 Op.isNaN "-sNaN"
+>>> fromBool $ op1 Op.isNaN "-sNaN"
 1
 -}
 
 -- | 'isNormal' takes one operand. The result is 1 if the operand is a
 -- positive or negative /normal number/; otherwise it is 0. This operation is
 -- quiet; no /flags/ are changed in the context.
-isNormal :: Precision a => Decimal a b -> Arith p r (Decimal p r)
-isNormal n = return $ case n of
-  _ | Number.isNormal n -> one
-    | otherwise         -> zero
+isNormal :: Precision a => Decimal a b -> Arith p r Bool
+isNormal = return . Number.isNormal
 
 {- $doctest-isNormal
->>> op1 Op.isNormal "2.50"
+>>> fromBool $ op1 Op.isNormal "2.50"
 1
 
->>> op1 Op.isNormal "0.1E-999"
+>>> fromBool $ op1 Op.isNormal "0.1E-999"
 0
 
->>> op1 Op.isNormal "0.00"
+>>> fromBool $ op1 Op.isNormal "0.00"
 0
 
->>> op1 Op.isNormal "-Inf"
+>>> fromBool $ op1 Op.isNormal "-Inf"
 0
 
->>> op1 Op.isNormal "NaN"
+>>> fromBool $ op1 Op.isNormal "NaN"
 0
 -}
 
 -- | 'isQNaN' takes one operand. The result is 1 if the operand is a quiet
 -- NaN; otherwise it is 0. This operation is unaffected by context and is
 -- quiet – no /flags/ are changed in the context.
-isQNaN :: Decimal a b -> Arith p r (Decimal p r)
+isQNaN :: Decimal a b -> Arith p r Bool
 isQNaN n = return $ case n of
-  QNaN{} -> one
-  _      -> zero
+  QNaN{} -> True
+  _      -> False
 
 {- $doctest-isQNaN
->>> op1 Op.isQNaN "2.50"
+>>> fromBool $ op1 Op.isQNaN "2.50"
 0
 
->>> op1 Op.isQNaN "NaN"
+>>> fromBool $ op1 Op.isQNaN "NaN"
 1
 
->>> op1 Op.isQNaN "sNaN"
+>>> fromBool $ op1 Op.isQNaN "sNaN"
 0
 -}
 
 -- | 'isSigned' takes one operand. The result is 1 if the /sign/ of the
 -- operand is 1; otherwise it is 0. This operation is unaffected by context
 -- and is quiet – no /flags/ are changed in the context.
-isSigned :: Decimal a b -> Arith p r (Decimal p r)
+isSigned :: Decimal a b -> Arith p r Bool
 isSigned n = return $ case sign n of
-  Neg -> one
-  Pos -> zero
+  Neg -> True
+  Pos -> False
 
 {- $doctest-isSigned
->>> op1 Op.isSigned "2.50"
+>>> fromBool $ op1 Op.isSigned "2.50"
 0
 
->>> op1 Op.isSigned "-12"
+>>> fromBool $ op1 Op.isSigned "-12"
 1
 
->>> op1 Op.isSigned "-0"
+>>> fromBool $ op1 Op.isSigned "-0"
 1
 -}
 
 -- | 'isSNaN' takes one operand. The result is 1 if the operand is a signaling
 -- NaN; otherwise it is 0. This operation is unaffected by context and is
 -- quiet – no /flags/ are changed in the context.
-isSNaN :: Decimal a b -> Arith p r (Decimal p r)
+isSNaN :: Decimal a b -> Arith p r Bool
 isSNaN n = return $ case n of
-  SNaN{} -> one
-  _      -> zero
+  SNaN{} -> True
+  _      -> False
 
 {- $doctest-isSNaN
->>> op1 Op.isSNaN "2.50"
+>>> fromBool $ op1 Op.isSNaN "2.50"
 0
 
->>> op1 Op.isSNaN "NaN"
+>>> fromBool $ op1 Op.isSNaN "NaN"
 0
 
->>> op1 Op.isSNaN "sNaN"
+>>> fromBool $ op1 Op.isSNaN "sNaN"
 1
 -}
 
 -- | 'isSubnormal' takes one operand. The result is 1 if the operand is a
 -- positive or negative /subnormal number/; otherwise it is 0. This operation
 -- is quiet; no /flags/ are changed in the context.
-isSubnormal :: Precision a => Decimal a b -> Arith p r (Decimal p r)
-isSubnormal n = return $ case n of
-  _ | Number.isSubnormal n -> one
-    | otherwise            -> zero
+isSubnormal :: Precision a => Decimal a b -> Arith p r Bool
+isSubnormal = return . Number.isSubnormal
 
 {- $doctest-isSubnormal
->>> op1 Op.isSubnormal "2.50"
+>>> fromBool $ op1 Op.isSubnormal "2.50"
 0
 
->>> op1 Op.isSubnormal "0.1E-999"
+>>> fromBool $ op1 Op.isSubnormal "0.1E-999"
 1
 
->>> op1 Op.isSubnormal "0.00"
+>>> fromBool $ op1 Op.isSubnormal "0.00"
 0
 
->>> op1 Op.isSubnormal "-Inf"
+>>> fromBool $ op1 Op.isSubnormal "-Inf"
 0
 
->>> op1 Op.isSubnormal "NaN"
+>>> fromBool $ op1 Op.isSubnormal "NaN"
 0
 -}
 
 -- | 'isZero' takes one operand. The result is 1 if the operand is a zero;
 -- otherwise it is 0. This operation is unaffected by context and is quiet –
 -- no /flags/ are changed in the context.
-isZero :: Decimal a b -> Arith p r (Decimal p r)
-isZero n = return $ case n of
-  _ | Number.isZero n -> one
-    | otherwise       -> zero
+isZero :: Decimal a b -> Arith p r Bool
+isZero = return . Number.isZero
 
 {- $doctest-isZero
->>> op1 Op.isZero "0"
+>>> fromBool $ op1 Op.isZero "0"
 1
 
->>> op1 Op.isZero "2.50"
+>>> fromBool $ op1 Op.isZero "2.50"
 0
 
->>> op1 Op.isZero "-0E+2"
+>>> fromBool $ op1 Op.isZero "-0E+2"
 1
 -}
 
@@ -1022,33 +1020,33 @@ radix = return radix'
 -- are NaNs or both are infinities.
 --
 -- 'sameQuantum' does not change any /flags/ in the context.
-sameQuantum :: Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+sameQuantum :: Decimal a b -> Decimal c d -> Arith p r Bool
 sameQuantum Num { exponent = e1 } Num { exponent = e2 }
-  | e1 == e2  = return one
-  | otherwise = return zero
-sameQuantum Inf {} Inf {} = return one
-sameQuantum QNaN{} QNaN{} = return one
-sameQuantum SNaN{} SNaN{} = return one
-sameQuantum QNaN{} SNaN{} = return one
-sameQuantum SNaN{} QNaN{} = return one
-sameQuantum _      _      = return zero
+  | e1 == e2  = return True
+  | otherwise = return False
+sameQuantum Inf {} Inf {} = return True
+sameQuantum QNaN{} QNaN{} = return True
+sameQuantum SNaN{} SNaN{} = return True
+sameQuantum QNaN{} SNaN{} = return True
+sameQuantum SNaN{} QNaN{} = return True
+sameQuantum _      _      = return False
 
 {- $doctest-sameQuantum
->>> op2 Op.sameQuantum "2.17" "0.001"
+>>> fromBool $ op2 Op.sameQuantum "2.17" "0.001"
 0
 
->>> op2 Op.sameQuantum "2.17" "0.01"
+>>> fromBool $ op2 Op.sameQuantum "2.17" "0.01"
 1
 
->>> op2 Op.sameQuantum "2.17" "0.1"
+>>> fromBool $ op2 Op.sameQuantum "2.17" "0.1"
 0
 
->>> op2 Op.sameQuantum "2.17" "1"
+>>> fromBool $ op2 Op.sameQuantum "2.17" "1"
 0
 
->>> op2 Op.sameQuantum "Inf" "-Inf"
+>>> fromBool $ op2 Op.sameQuantum "Inf" "-Inf"
 1
 
->>> op2 Op.sameQuantum "NaN" "NaN"
+>>> fromBool $ op2 Op.sameQuantum "NaN" "NaN"
 1
 -}

@@ -20,7 +20,7 @@ module Numeric.Decimal.Number
 
        , flipSign
        , cast
-       , toBool
+       , fromBool
 
        , isPositive
        , isNegative
@@ -473,6 +473,12 @@ isSubnormal :: Precision p => Decimal p r -> Bool
 isSubnormal n
   | isFinite n && not (isZero n) = maybe False (adjustedExponent n <) (eMin n)
   | otherwise                    = False
+
+-- | If the argument is 'False', return a 'Decimal' value zero; if 'True',
+-- return the value one.
+fromBool :: Bool -> Decimal p r
+fromBool False = zero
+fromBool True  = one
 
 -- | Return 'False' if the argument is zero or NaN, and 'True' otherwise.
 toBool :: Decimal p r -> Bool
