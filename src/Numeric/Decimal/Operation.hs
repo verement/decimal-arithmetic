@@ -39,7 +39,7 @@ module Numeric.Decimal.Operation
          -- nextToward
          -- power
          -- quantize
-         , reduce
+       , reduce
          -- remainder
          -- remainderNear
          -- roundToIntegralExact
@@ -50,30 +50,30 @@ module Numeric.Decimal.Operation
          -- $miscellaneous-operations
 
          -- and
-         , canonical
-         , class_, Class(..), Sign(..), Subclass(..)
+       , canonical
+       , class_, Class(..), Sign(..), Subclass(..)
          -- compareTotal
          -- compareTotalMagnitude
-         , copy
-         , copyAbs
-         , copyNegate
-         , copySign
+       , copy
+       , copyAbs
+       , copyNegate
+       , copySign
          -- invert
-         , isCanonical
-         , isFinite
-         , isInfinite
-         , isNaN
-         , isNormal
-         , isQNaN
-         , isSigned
-         , isSNaN
-         , isSubnormal
-         , isZero
+       , isCanonical
+       , isFinite
+       , isInfinite
+       , isNaN
+       , isNormal
+       , isQNaN
+       , isSigned
+       , isSNaN
+       , isSubnormal
+       , isZero
          -- logb
          -- or
-         , radix
+       , radix
          -- rotate
-         , sameQuantum
+       , sameQuantum
          -- scaleb
          -- shift
          -- xor
