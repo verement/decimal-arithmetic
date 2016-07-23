@@ -282,10 +282,14 @@ multiply Num { sign = xs, coefficient = xc, exponent = xe }
 
 multiply Inf { sign = xs } Inf { sign = ys } =
   return Inf { sign = xorSigns xs ys }
-multiply Inf { sign = xs } Num { sign = ys } =
-  return Inf { sign = xorSigns xs ys }
-multiply Num { sign = xs } Inf { sign = ys } =
-  return Inf { sign = xorSigns xs ys }
+multiply Inf { sign = xs } Num { sign = ys, coefficient = yc }
+  | yc == 0   = invalidOperation qNaN
+  | otherwise = return Inf { sign = xorSigns xs ys }
+multiply Num { sign = xs, coefficient = xc } Inf { sign = ys }
+  | xc == 0   = invalidOperation qNaN
+  | otherwise = return Inf { sign = xorSigns xs ys }
+multiply nan@SNaN{} _ = invalidOperation nan
+multiply _ nan@SNaN{} = invalidOperation nan
 multiply x y = return (toQNaN2 x y)
 
 {- $doctest-multiply
