@@ -24,7 +24,7 @@ module Numeric.Decimal.Operation
        , divide
          -- divideInteger
          -- exp
-         -- fusedMultiplyAdd
+       , fusedMultiplyAdd
          -- ln
          -- log10
        , max
@@ -307,6 +307,41 @@ multiply x y = return (toQNaN2 x y)
 
 >>> op2 Op.multiply "654321" "654321"
 4.28135971E+11
+-}
+
+-- | 'fusedMultiplyAdd' takes three operands; the first two are multiplied
+-- together, using 'multiply', with sufficient precision and exponent range
+-- that the result is exact and unrounded. No /flags/ are set by the
+-- multiplication unless one of the first two operands is a signaling NaN or
+-- one is a zero and the other is an infinity.
+--
+-- Unless the multiplication failed, the third operand is then added to the
+-- result of that multiplication, using 'add', under the current context.
+--
+-- In other words, @fusedMultiplyAdd x y z@ delivers a result which is @(x ×
+-- y) + z@ with only the one, final, rounding.
+fusedMultiplyAdd :: (Precision p, Rounding r)
+                 => Decimal a b -> Decimal c d -> Decimal e f
+                 -> Arith p r (Decimal p r)
+fusedMultiplyAdd x y z =
+  either raise (return . coerce) (exactMult x y) >>= add z
+
+  where exactMult :: Rounding r => Decimal a b -> Decimal c d
+                  -> Either (Exception PInfinite r) (Decimal PInfinite r)
+        exactMult x y = evalArith (multiply x y) newContext
+
+        raise :: Exception a r -> Arith p r (Decimal p r)
+        raise e = raiseSignal (exceptionSignal e) (coerce $ exceptionResult e)
+
+{- $doctest-fusedMultiplyAdd
+>>> op3 Op.fusedMultiplyAdd "3" "5" "7"
+22
+
+>>> op3 Op.fusedMultiplyAdd "3" "-5" "7"
+-8
+
+>>> op3 Op.fusedMultiplyAdd "888565290" "1557.96930" "-86087.7578"
+1.38435736E+12
 -}
 
 -- | 'divide' takes two operands. If either operand is a /special value/ then the general rules apply.

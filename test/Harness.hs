@@ -58,3 +58,8 @@ op1 op x = either exceptionError id $ evalArith arith newContext
 op2 :: (BasicDecimal -> BasicDecimal -> BasicArith a) -> String -> String -> a
 op2 op x y = either exceptionError id $ evalArith arith newContext
   where arith = read x `op` read y
+
+op3 :: (BasicDecimal -> BasicDecimal -> BasicDecimal -> BasicArith a)
+    -> String -> String -> String -> a
+op3 op x y z = either exceptionError id $ evalArith arith newContext
+  where arith = op (read x) (read y) (read z)
