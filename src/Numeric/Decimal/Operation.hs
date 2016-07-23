@@ -75,7 +75,7 @@ module Numeric.Decimal.Operation
          -- rotate
        , sameQuantum
          -- scaleb
-         -- shift
+       , shift
          -- xor
        ) where
 
@@ -1103,4 +1103,54 @@ sameQuantum _      _      = return False
 
 >>> fromBool $ op2 Op.sameQuantum "NaN" "NaN"
 1
+-}
+
+-- | 'shift' takes two operands. The second operand must be an integer (with
+-- an /exponent/ of 0) in the range /-precision/ through /precision/. If the
+-- first operand is a NaN then the general arithmetic rules apply, and if it
+-- is infinite then the result is the Infinity unchanged.
+--
+-- Otherwise (the first operand is finite) the result has the same /sign/ and
+-- /exponent/ as the first operand, and a /coefficient/ which is a shifted
+-- copy of the digits in the coefficient of the first operand. The number of
+-- places to shift is taken from the absolute value of the second operand,
+-- with the shift being to the left if the second operand is positive or to
+-- the right otherwise. Digits shifted into the coefficient are zeros.
+--
+-- The only /flag/ that might be set is /invalid-operation/ (set if the first
+-- operand is an sNaN or the second is not valid).
+--
+-- The 'rotate' operation can be used to rotate rather than shift a
+-- coefficient.
+shift :: Precision p => Decimal p a -> Decimal b c -> Arith p r (Decimal p a)
+shift n@Num { coefficient = c } s@Num { sign = d, coefficient = sc }
+  | validShift n s = return $ case d of
+      Pos -> case precision n of
+        Just p  -> n { coefficient = (c  *     10 ^ sc) `rem` 10 ^ p }
+        Nothing -> n { coefficient =  c  *     10 ^ sc }
+      Neg ->       n { coefficient =  c `quot` 10 ^ sc }
+shift n@Inf{}  s | validShift n s = return n
+shift n@QNaN{} s | validShift n s = return n
+shift n        _                  = coerce <$> invalidOperation n
+
+validShift :: Precision p => Decimal p a -> Decimal b c -> Bool
+validShift n Num { coefficient = c, exponent = 0 } =
+  let p = fromIntegral <$> precision n in maybe True (c <=) p
+validShift _ _ = False
+
+{- $doctest-shift
+>>> op2 Op.shift "34" "8"
+400000000
+
+>>> op2 Op.shift "12" "9"
+0
+
+>>> op2 Op.shift "123456789" "-2"
+1234567
+
+>>> op2 Op.shift "123456789" "0"
+123456789
+
+>>> op2 Op.shift "123456789" "+2"
+345678900
 -}
