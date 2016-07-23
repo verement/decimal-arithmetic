@@ -20,7 +20,7 @@ module Numeric.Decimal.Operation
        , add
        , subtract
        , compare
-         -- compareSignal
+       , compareSignal
        , divide
          -- divideInteger
          -- exp
@@ -122,6 +122,10 @@ toQNaN2 _ nan@SNaN{} = toQNaN nan
 toQNaN2 nan@QNaN{} _ = coerce nan
 toQNaN2 _ nan@QNaN{} = coerce nan
 toQNaN2 n _          = toQNaN n
+
+quietToSignal :: Decimal p r -> Decimal p r
+quietToSignal QNaN { sign = s, payload = p } = SNaN { sign = s, payload = p }
+quietToSignal x = x
 
 -- $arithmetic-operations
 --
@@ -488,6 +492,17 @@ compare x y          = return (toQNaN2 x y)
 >>> op2 Op.compare "-3" "2.1"
 -1
 -}
+
+-- | 'compareSignal' takes two operands and compares their values
+-- numerically. This operation is identical to 'compare', except that if
+-- neither operand is a signaling NaN then any quiet NaN operand is treated as
+-- though it were a signaling NaN. (That is, all NaNs signal, with signaling
+-- NaNs taking precedence over quiet NaNs.)
+compareSignal :: (Precision p, Rounding r)
+              => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+compareSignal x@SNaN{} y        =               x `compare`               y
+compareSignal x        y@SNaN{} =               x `compare`               y
+compareSignal x        y        = quietToSignal x `compare` quietToSignal y
 
 -- | 'max' takes two operands, compares their values numerically, and returns
 -- the maximum. If either operand is a NaN then the general rules apply,
