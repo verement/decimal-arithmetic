@@ -978,9 +978,7 @@ isQNaN n = return $ case n of
 -- operand is 1; otherwise it is 0. This operation is unaffected by context
 -- and is quiet – no /flags/ are changed in the context.
 isSigned :: Decimal a b -> Arith p r Bool
-isSigned n = return $ case sign n of
-  Neg -> True
-  Pos -> False
+isSigned = return . Number.isNegative
 
 {- $doctest-isSigned
 >>> fromBool $ op1 Op.isSigned "2.50"
