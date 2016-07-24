@@ -69,7 +69,7 @@ module Numeric.Decimal.Operation
        , isSNaN
        , isSubnormal
        , isZero
-         -- logb
+       , logb
          -- or
        , radix
          -- rotate
@@ -1050,6 +1050,39 @@ isZero = return . Number.isZero
 
 >>> fromBool $ op1 Op.isZero "-0E+2"
 1
+-}
+
+-- | 'logb' takes one operand. If the operand is a NaN then the general
+-- arithmetic rules apply. If the operand is infinite then +Infinity is
+-- returned. If the operand is a zero, then -Infinity is returned and the
+-- Division by zero exceptional condition is raised.
+--
+-- Otherwise, the result is the integer which is the exponent of the magnitude
+-- of the most significant digit of the operand (as though the operand were
+-- truncated to a single digit while maintaining the value of that digit and
+-- without limiting the resulting exponent). All results are exact unless an
+-- integer result does not fit in the available /precision/.
+logb :: (Precision p, Rounding r) => Decimal a b -> Arith p r (Decimal p r)
+logb Num { coefficient = c, exponent = e }
+  | c == 0    = raiseSignal DivisionByZero Inf { sign = Neg }
+  | otherwise = round (fromInteger r)
+  where r = fromIntegral (numDigits c) - 1 + fromIntegral e :: Integer
+logb Inf{} = return Inf { sign = Pos }
+logb n@QNaN{} = return (coerce n)
+logb n@SNaN{} = invalidOperation n
+
+{- $doctest-logb
+>>> op1 Op.logb "250"
+2
+
+>>> op1 Op.logb "2.50"
+0
+
+>>> op1 Op.logb "0.03"
+-2
+
+>>> op1 Op.logb "0"
+-Infinity
 -}
 
 -- | 'radix' takes no operands. The result is the radix (base) in which
