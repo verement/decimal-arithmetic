@@ -249,12 +249,12 @@ showNumber exponential num = signStr . case num of
   SNaN { payload = p } -> showString "sNaN" . diag p
 
   where signStr :: ShowS
-        signStr = showString $ case sign num of
-          Pos -> ""
-          Neg -> "-"
+        signStr = case sign num of
+          Pos -> id
+          Neg -> showChar '-'
 
         diag :: Payload -> ShowS
-        diag 0 = showString ""
+        diag 0 = id
         diag d = shows d
 
 showExponent :: Exponent -> ShowS
