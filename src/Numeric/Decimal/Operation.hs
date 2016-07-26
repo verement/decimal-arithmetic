@@ -51,7 +51,7 @@ module Numeric.Decimal.Operation
 
          -- and
        , canonical
-       , class_, Class(..), Sign(..), Subclass(..)
+       , class_, Class(..), Sign(..), NumberClass(..), NaNClass(..)
          -- compareTotal
          -- compareTotalMagnitude
        , copy
@@ -716,35 +716,46 @@ canonical = return
 -- ignored in the classification, as required by IEEE 754.
 class_ :: Precision a => Decimal a b -> Arith p r Class
 class_ n = return $ case n of
-  Num {} | Number.isZero n      -> Class (sign n) ZeroClass
-         | Number.isSubnormal n -> Class (sign n) SubnormalClass
-         | otherwise            -> Class (sign n) NormalClass
-  Inf {}                        -> Class (sign n) InfinityClass
-  QNaN{}                        -> Class  Pos     NaNClass
-  SNaN{}                        -> Class  Neg     NaNClass
+  Num {} | Number.isZero n      -> NumberClass (sign n) ZeroClass
+         | Number.isSubnormal n -> NumberClass (sign n) SubnormalClass
+         | otherwise            -> NumberClass (sign n) NormalClass
+  Inf {}                        -> NumberClass (sign n) InfinityClass
+  QNaN{}                        -> NaNClass QNaNClass
+  SNaN{}                        -> NaNClass SNaNClass
 
-data Class = Class Sign Subclass deriving Eq
+data Class = NumberClass Sign NumberClass -- ^ Number (finite or infinite)
+           | NaNClass NaNClass            -- ^ Not a number (quiet or signaling)
+           deriving Eq
 
-data Subclass = ZeroClass       -- ^ Zero
-              | NormalClass     -- ^ Normal finite number
-              | SubnormalClass  -- ^ Subnormal finite number
-              | InfinityClass   -- ^ Infinity
-              | NaNClass        -- ^ Not a number (quiet or signaling)
+data NumberClass = ZeroClass       -- ^ Zero
+                 | SubnormalClass  -- ^ Subnormal finite number
+                 | NormalClass     -- ^ Normal finite number
+                 | InfinityClass   -- ^ Infinity
+                 deriving Eq
+
+data NaNClass = QNaNClass  -- ^ Not a number (quiet)
+              | SNaNClass  -- ^ Not a number (signaling)
               deriving Eq
 
 instance Show Class where
   show c = case c of
-    Class Pos s@NaNClass ->       showSubclass s
-    Class Neg s@NaNClass -> 's' : showSubclass s
-    Class Pos s          -> '+' : showSubclass s
-    Class Neg s          -> '-' : showSubclass s
+    NumberClass s nc   -> signChar s : showNumberClass nc
+    NaNClass QNaNClass ->       nan
+    NaNClass SNaNClass -> 's' : nan
 
-    where showSubclass s = case s of
+    where signChar :: Sign -> Char
+          signChar Pos = '+'
+          signChar Neg = '-'
+
+          showNumberClass :: NumberClass -> String
+          showNumberClass s = case s of
             ZeroClass      -> "Zero"
-            NormalClass    -> "Normal"
             SubnormalClass -> "Subnormal"
+            NormalClass    -> "Normal"
             InfinityClass  -> "Infinity"
-            NaNClass       -> "NaN"
+
+          nan :: String
+          nan = "NaN"
 
 {- $doctest-class_
 >>> op1 Op.class_ "Infinity"
