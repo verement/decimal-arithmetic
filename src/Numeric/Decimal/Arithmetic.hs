@@ -39,6 +39,7 @@ module Numeric.Decimal.Arithmetic
        , Signals
        , signal
        , signals
+       , allSignals
        , signalMember
 
        , raiseSignal
@@ -53,7 +54,7 @@ import Control.Monad.Except (MonadError(throwError, catchError),
                              ExceptT, runExceptT)
 import Control.Monad.State (MonadState(get, put), modify, gets,
                             State, runState, evalState)
-import Data.Bits (bit, complement, testBit, (.&.), (.|.))
+import Data.Bits (zeroBits, bit, complement, testBit, (.&.), (.|.))
 import Data.Coerce (coerce)
 import Data.Monoid ((<>))
 
@@ -218,7 +219,7 @@ instance Show Signals where
     showString "signals " . showsPrec 11 (signalList sigs)
 
 instance Monoid Signals where
-  mempty = Signals 0
+  mempty = Signals zeroBits
   Signals x `mappend` Signals y = Signals (x .|. y)
 
 -- | Create a set of signals from a singleton.
@@ -228,6 +229,10 @@ signal = Signals . bit . fromEnum
 -- | Create a set of signals from a list.
 signals :: [Signal] -> Signals
 signals = mconcat . map signal
+
+-- | A set containing every signal
+allSignals :: Signals
+allSignals = Signals (complement zeroBits)
 
 -- | Enumerate the given set of signals.
 signalList :: Signals -> [Signal]
