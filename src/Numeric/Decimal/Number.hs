@@ -37,6 +37,7 @@ module Numeric.Decimal.Number
 
 import Prelude hiding (exponent, round)
 
+import Control.Monad (join)
 import Data.Char (isSpace)
 import Data.Coerce (coerce)
 import Data.Ratio (numerator, denominator, (%))
@@ -307,8 +308,12 @@ notyet = error . (++ ": not yet implemented")
 instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   pi = castDown seriesPi
 
-  exp   = castRounding . evalOp . Op.exp
-  log   = castRounding . evalOp . Op.ln
+  exp = castRounding . evalOp . Op.exp
+  log = castRounding . evalOp . Op.ln
+
+  logBase 10 x = castRounding $ evalOp (Op.log10 x)
+  logBase _  1 = zero
+  logBase b  x = evalOp (join $ Op.divide <$> Op.ln x <*> Op.ln b)
 
   sin   = notyet "sin"
   cos   = notyet "cos"

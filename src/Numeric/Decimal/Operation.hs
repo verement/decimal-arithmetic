@@ -26,7 +26,7 @@ module Numeric.Decimal.Operation
        , exp
        , fusedMultiplyAdd
        , ln
-         -- log10
+       , log10
        , max
        , maxMagnitude
        , min
@@ -83,6 +83,7 @@ import Prelude hiding (abs, compare, exp, exponent, isInfinite, isNaN, max, min,
                        round, subtract)
 import qualified Prelude
 
+import Control.Monad (join)
 import Data.Coerce (coerce)
 
 import Numeric.Decimal.Arithmetic
@@ -510,6 +511,70 @@ ln n = coerce <$> invalidOperation n
 2.30258509
 
 >>> op1 Op.ln "+Infinity"
+Infinity
+-}
+
+-- | 'log10' takes one operand. If the operand is a NaN then the general rules
+-- for special values apply.
+--
+-- Otherwise, the operand must be a zero or positive, and the result is the
+-- base 10 logarithm of the operand, with the following cases:
+--
+-- * If the operand is a zero, the result is -Infinity and exact.
+--
+-- * If the operand is +Infinity, the result is +Infinity and exact.
+--
+-- * If the operand equals an integral power of ten (including 10^0 and
+-- negative powers) and there is sufficient /precision/ to hold the integral
+-- part of the result, the result is an integer (with an exponent of 0) and
+-- exact.
+--
+-- * Otherwise the result is inexact and will be rounded using the
+-- /round-half-even/ algorithm. The coefficient will have exactly /precision/
+-- digits (unless the result is subnormal). These inexact results should be
+-- correctly rounded, but may be up to 1 ulp (unit in last place) in error.
+log10 :: FinitePrecision p => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
+log10 x@Num { sign = s, coefficient = c, exponent = e }
+  | c == 0   = return infinity { sign = Neg }
+  | s == Pos = getPrecision >>= \prec -> case powerOfTen c e of
+      Just p | maybe True (numDigits pc <=) prec -> return (fromInteger p)
+        where pc = fromInteger (Prelude.abs p) :: Coefficient
+      _ -> subArith (join $ divide <$> ln x <*> ln ten) >>= result
+
+  where powerOfTen :: Coefficient -> Exponent -> Maybe Integer
+        powerOfTen c e
+          | c == 10^d = Just (fromIntegral e + fromIntegral d)
+          | otherwise = Nothing
+          where d = numDigits c - 1 :: Int
+
+        result :: Decimal p a -> Arith p r (Decimal p a)
+        result r = coerce <$> (raiseSignal Rounded =<< raiseSignal Inexact r')
+          where r' = coerce r
+
+log10 n@Inf { sign = Pos } = return (coerce n)
+log10 n@QNaN{} = return (coerce n)
+log10 n = coerce <$> invalidOperation n
+
+{- $doctest-log10
+>>> op1 Op.log10 "0"
+-Infinity
+
+>>> op1 Op.log10 "0.001"
+-3
+
+>>> op1 Op.log10 "1.000"
+0
+
+>>> op1 Op.log10 "2"
+0.301029996
+
+>>> op1 Op.log10 "10"
+1
+
+>>> op1 Op.log10 "70"
+1.84509804
+
+>>> op1 Op.log10 "+Infinity"
 Infinity
 -}
 

@@ -7,6 +7,7 @@ module Numeric.Decimal.Operation
        , divide
        , exp
        , ln
+       , log10
        , minus
        , abs
        , compare
@@ -32,6 +33,8 @@ divide   :: (FinitePrecision p, Rounding r)
 exp      :: FinitePrecision p
          => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
 ln       :: FinitePrecision p
+         => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
+log10    :: FinitePrecision p
          => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
 minus    :: (Precision p, Rounding r)
          => Decimal a b -> Arith p r (Decimal p r)
