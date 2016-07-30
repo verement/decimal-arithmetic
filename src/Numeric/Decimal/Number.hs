@@ -15,6 +15,8 @@ module Numeric.Decimal.Number
        , oneHalf
        , one
        , negativeOne
+       , two
+       , ten
        , infinity
        , qNaN
        , sNaN
@@ -306,7 +308,7 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   pi = castDown seriesPi
 
   exp   = castRounding . evalOp . Op.exp
-  log   = notyet "log"
+  log   = castRounding . evalOp . Op.ln
 
   sin   = notyet "sin"
   cos   = notyet "cos"
@@ -399,6 +401,10 @@ one = zero { coefficient = 1 }
 -- | A 'Decimal' representing the value two
 two :: Decimal p r
 two = zero { coefficient = 2 }
+
+-- | A 'Decimal' representing the value ten
+ten :: Decimal p r
+ten = zero { coefficient = 10 }
 
 -- | A 'Decimal' representing the value negative one
 negativeOne :: Decimal p r

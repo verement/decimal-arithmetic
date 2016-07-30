@@ -25,7 +25,7 @@ module Numeric.Decimal.Operation
          -- divideInteger
        , exp
        , fusedMultiplyAdd
-         -- ln
+       , ln
          -- log10
        , max
        , maxMagnitude
@@ -428,6 +428,89 @@ fusedMultiplyAdd x y z =
 
 >>> op3 Op.fusedMultiplyAdd "888565290" "1557.96930" "-86087.7578"
 1.38435736E+12
+-}
+
+-- | 'ln' takes one operand. If the operand is a NaN then the general rules
+-- for special values apply.
+--
+-- Otherwise, the operand must be a zero or positive, and the result is the
+-- natural (base /e/) logarithm of the operand, with the following cases:
+--
+-- * If the operand is a zero, the result is -Infinity and exact.
+--
+-- * If the operand is +Infinity, the result is +Infinity and exact.
+--
+-- * If the operand equals one, the result is 0 and exact.
+--
+-- * Otherwise the result is inexact and will be rounded using the
+-- /round-half-even/ algorithm. The coefficient will have exactly /precision/
+-- digits (unless the result is subnormal). These inexact results should be
+-- correctly rounded, but may be up to 1 ulp (unit in last place) in error.
+ln :: FinitePrecision p => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
+ln x@Num { sign = s, coefficient = c, exponent = e }
+  | c == 0   = return infinity { sign = Neg }
+  | s == Pos = if e <= 0 && c == 10^(-e) then return zero
+               else subArith (subLn x) >>= subRounded >>= result
+
+  where subLn :: FinitePrecision p => Decimal a b
+              -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+        subLn x = do
+          let fe = fromIntegral (-(numDigits c - 1)) :: Exponent
+              r  = fromIntegral (e - fe) :: Decimal PInfinite RoundHalfEven
+          lnf  <- taylor x { exponent = fe }
+          ln10 <- taylor ten
+          add lnf =<< multiply ln10 r
+
+        taylor :: FinitePrecision p => Decimal a b
+               -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+        taylor x = do
+          num <- x `subtract` one
+          den <- x `add` one
+          multiply two =<< sum =<< num `divide` den
+
+        sum :: FinitePrecision p => Decimal p RoundHalfEven
+            -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+        sum b = multiply b b >>= \b2 -> sum' b b b2 one
+          where sum' :: FinitePrecision p
+                     => Decimal p RoundHalfEven
+                     -> Decimal p RoundHalfEven
+                     -> Decimal p RoundHalfEven
+                     -> Decimal PInfinite RoundHalfEven
+                     -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+                sum' s m b n = do
+                  m' <- multiply m b
+                  n' <- subArith (add n two)
+                  s' <- add s =<< divide m' n'
+                  if s' == s then return s' else sum' s' m' b n'
+
+        subRounded :: Precision p
+                   => Decimal (PPlus1 (PPlus1 p)) a
+                   -> Arith p r (Decimal p RoundHalfEven)
+        subRounded = subArith . round
+
+        result :: Decimal p a -> Arith p r (Decimal p a)
+        result r = coerce <$> (raiseSignal Rounded =<< raiseSignal Inexact r')
+          where r' = coerce r
+
+ln n@Inf { sign = Pos } = return (coerce n)
+ln n@QNaN{} = return (coerce n)
+ln n = coerce <$> invalidOperation n
+
+{- $doctest-ln
+>>> op1 Op.ln "0"
+-Infinity
+
+>>> op1 Op.ln "1.000"
+0
+
+>>> op1 Op.ln "2.71828183"
+1.00000000
+
+>>> op1 Op.ln "10"
+2.30258509
+
+>>> op1 Op.ln "+Infinity"
+Infinity
 -}
 
 -- | 'divide' takes two operands. If either operand is a /special value/ then the general rules apply.
