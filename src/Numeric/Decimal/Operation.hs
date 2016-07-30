@@ -23,7 +23,7 @@ module Numeric.Decimal.Operation
        , compareSignal
        , divide
          -- divideInteger
-         -- exp
+       , exp
        , fusedMultiplyAdd
          -- ln
          -- log10
@@ -79,7 +79,7 @@ module Numeric.Decimal.Operation
          -- xor
        ) where
 
-import Prelude hiding (abs, compare, exponent, isInfinite, isNaN, max, min,
+import Prelude hiding (abs, compare, exp, exponent, isInfinite, isNaN, max, min,
                        round, subtract)
 import qualified Prelude
 
@@ -309,6 +309,92 @@ multiply x y = return (toQNaN2 x y)
 4.28135971E+11
 -}
 
+-- | 'exp' takes one operand. If the operand is a NaN then the general rules
+-- for special values apply.
+--
+-- Otherwise, the result is /e/ raised to the power of the operand, with the
+-- following cases:
+--
+-- * If the operand is -Infinity, the result is 0 and exact.
+--
+-- * If the operand is a zero, the result is 1 and exact.
+--
+-- * If the operand is +Infinity, the result is +Infinity and exact.
+--
+-- * Otherwise the result is inexact and will be rounded using the
+-- /round-half-even/ algorithm. The coefficient will have exactly /precision/
+-- digits (unless the result is subnormal). These inexact results should be
+-- correctly rounded, but may be up to 1 ulp (unit in last place) in error.
+exp :: FinitePrecision p => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
+exp x@Num { sign = s, coefficient = c }
+  | c == 0    = return one
+  | s == Neg  = subArith (maclaurin x { sign = Pos } >>= reciprocal) >>=
+                subRounded >>= result
+  | otherwise = subArith (maclaurin x) >>= subRounded >>= result
+
+  where multiplyExact :: Decimal a b -> Decimal c d
+                      -> Arith PInfinite RoundHalfEven
+                         (Decimal PInfinite RoundHalfEven)
+        multiplyExact = multiply
+
+        maclaurin :: FinitePrecision p => Decimal a b
+                  -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+        maclaurin x
+          | adjustedExponent x >= 0 = subArith (subMaclaurin x) >>= subRounded
+          | otherwise = sum one one one one
+          where sum :: FinitePrecision p
+                    => Decimal p RoundHalfEven
+                    -> Decimal PInfinite RoundHalfEven
+                    -> Decimal PInfinite RoundHalfEven
+                    -> Decimal PInfinite RoundHalfEven
+                    -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+                sum s num den n = do
+                  num' <- subArith (multiplyExact num x)
+                  den' <- subArith (multiplyExact den n)
+                  s' <- add s =<< divide num' den'
+                  if s' == s then return s'
+                    else sum s' num' den' =<< subArith (add n one)
+
+        subMaclaurin :: FinitePrecision p => Decimal a b
+                     -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+        subMaclaurin x = subArith (multiplyExact x oneHalf) >>= maclaurin >>=
+          \r -> multiply r r
+
+        subRounded :: Precision p
+                   => Decimal (PPlus1 (PPlus1 p)) a
+                   -> Arith p r (Decimal p RoundHalfEven)
+        subRounded = subArith . round
+
+        result :: Decimal p a -> Arith p r (Decimal p a)
+        result r = coerce <$> (raiseSignal Rounded =<< raiseSignal Inexact r')
+          where r' = coerce r
+
+exp n@Inf { sign = s }
+  | s == Pos  = return (coerce n)
+  | otherwise = return zero
+exp n@QNaN{}  = return (coerce n)
+exp n@SNaN{}  = coerce <$> invalidOperation n
+
+{- $doctest-exp
+>>> op1 Op.exp "-Infinity"
+0
+
+>>> op1 Op.exp "-1"
+0.367879441
+
+>>> op1 Op.exp "0"
+1
+
+>>> op1 Op.exp "1"
+2.71828183
+
+>>> op1 Op.exp "0.693147181"
+2.00000000
+
+>>> op1 Op.exp "+Infinity"
+Infinity
+-}
+
 -- | 'fusedMultiplyAdd' takes three operands; the first two are multiplied
 -- together, using 'multiply', with sufficient precision and exponent range
 -- that the result is exact and unrounded. No /flags/ are set by the
@@ -448,6 +534,10 @@ longDivision dd dv p = step1 dd dv 0
         step4 :: Quotient -> Remainder -> Divisor -> Exponent
               -> (Quotient, Remainder, Divisor, Exponent)
         step4 = (,,,)
+
+reciprocal :: (FinitePrecision p, Rounding r)
+           => Decimal a b -> Arith p r (Decimal p r)
+reciprocal = divide one
 
 -- | 'abs' takes one operand. If the operand is negative, the result is the
 -- same as using the 'minus' operation on the operand. Otherwise, the result

@@ -5,6 +5,7 @@ module Numeric.Decimal.Operation
        , subtract
        , multiply
        , divide
+       , exp
        , minus
        , abs
        , compare
@@ -12,7 +13,7 @@ module Numeric.Decimal.Operation
        , max
        ) where
 
-import Prelude hiding (abs, compare, max, min, subtract)
+import Prelude hiding (abs, compare, exp, max, min, subtract)
 
 import {-# SOURCE #-} Numeric.Decimal.Arithmetic
 import {-# SOURCE #-} Numeric.Decimal.Number
@@ -27,6 +28,8 @@ multiply :: (Precision p, Rounding r)
          => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 divide   :: (FinitePrecision p, Rounding r)
          => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+exp      :: FinitePrecision p
+         => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
 minus    :: (Precision p, Rounding r)
          => Decimal a b -> Arith p r (Decimal p r)
 abs      :: (Precision p, Rounding r)

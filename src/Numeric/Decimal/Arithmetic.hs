@@ -26,6 +26,7 @@ module Numeric.Decimal.Arithmetic
        , Arith
        , runArith
        , evalArith
+       , subArith
 
          -- * Exceptional conditions
          -- $exceptional-conditions
@@ -53,6 +54,7 @@ import Control.Monad.Except (MonadError(throwError, catchError),
 import Control.Monad.State (MonadState(get, put), modify, gets,
                             State, runState, evalState)
 import Data.Bits (bit, complement, testBit, (.&.), (.|.))
+import Data.Coerce (coerce)
 import Data.Monoid ((<>))
 
 import Numeric.Decimal.Number
@@ -153,6 +155,17 @@ runArith (Arith e) = runState (runExceptT e)
 -- final value or exception, discarding the resulting context.
 evalArith :: Arith p r a -> Context p r -> Either (Exception p r) a
 evalArith (Arith e) = evalState (runExceptT e)
+
+-- | Perform a subcomputation using a different precision and/or rounding
+-- algorithm. The subcomputation is evaluated within a new context with all
+-- flags cleared and all traps disabled. Any flags set in the context of the
+-- subcomputation are ignored, but if an exception is returned it will be
+-- re-raised within the current context.
+subArith :: Arith a b (Decimal a b) -> Arith p r (Decimal a b)
+subArith arith = case evalArith arith newContext of
+  Left e  -> let result = coerce (exceptionResult e)
+             in coerce <$> raiseSignal (exceptionSignal e) result
+  Right r -> return r
 
 -- | Return the precision of the arithmetic context (or 'Nothing' if the
 -- precision is infinite).

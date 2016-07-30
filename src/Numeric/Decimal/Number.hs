@@ -12,6 +12,7 @@ module Numeric.Decimal.Number
 
        , Decimal(..)
        , zero
+       , oneHalf
        , one
        , negativeOne
        , infinity
@@ -28,6 +29,8 @@ module Numeric.Decimal.Number
        , isZero
        , isNormal
        , isSubnormal
+
+       , adjustedExponent
        ) where
 
 import Prelude hiding (exponent, round)
@@ -302,7 +305,7 @@ notyet = error . (++ ": not yet implemented")
 instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   pi = castDown seriesPi
 
-  exp   = notyet "exp"
+  exp   = castRounding . evalOp . Op.exp
   log   = notyet "log"
 
   sin   = notyet "sin"
@@ -422,6 +425,11 @@ flipSign n = n { sign = negateSign (sign n) }
 -- algorithm.
 cast :: (Precision p, Rounding r) => Decimal a b -> Decimal p r
 cast = evalOp . round . coerce
+
+-- | Cast a 'Decimal' to another rounding algorithm, maintaining the same
+-- precision. No new rounding occurs.
+castRounding :: Decimal p a -> Decimal p r
+castRounding = coerce
 
 -- | Return the number of decimal digits of the argument.
 numDigits :: Coefficient -> Int
