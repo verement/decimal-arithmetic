@@ -14,6 +14,8 @@ module Numeric.Decimal.Arithmetic
          Context
        , newContext
        , flags
+       , getPrecision
+       -- , getRounding
 
          -- *** Default contexts
          -- $default-contexts
@@ -151,6 +153,19 @@ runArith (Arith e) = runState (runExceptT e)
 -- final value or exception, discarding the resulting context.
 evalArith :: Arith p r a -> Context p r -> Either (Exception p r) a
 evalArith (Arith e) = evalState (runExceptT e)
+
+-- | Return the precision of the arithmetic context (or 'Nothing' if the
+-- precision is infinite).
+getPrecision :: Precision p => Arith p r (Maybe Int)
+getPrecision = getPrecision' undefined
+  where getPrecision' :: Precision p => p -> Arith p r (Maybe Int)
+        getPrecision' = return . precision
+
+-- | Return the rounding algorithm of the arithmetic context.
+getRounding :: Rounding r => Arith p r RoundingAlgorithm
+getRounding = getRounding' undefined
+  where getRounding' :: Rounding r => r -> Arith p r RoundingAlgorithm
+        getRounding' = return . rounding
 
 -- $exceptional-conditions
 --

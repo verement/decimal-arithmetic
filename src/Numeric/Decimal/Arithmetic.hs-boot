@@ -6,6 +6,7 @@ module Numeric.Decimal.Arithmetic
        ( Arith
        , newContext
        , evalArith
+       , getPrecision
        , Signal(..)
        , raiseSignal
        , exceptionResult
@@ -15,8 +16,7 @@ import Control.Monad.Except (ExceptT)
 import Control.Monad.State (State)
 
 import {-# SOURCE #-} Numeric.Decimal.Number
-
---instance Precision p => Precision (Arith p r a)
+import                Numeric.Decimal.Precision (Precision)
 
 data Context p r
 newContext :: Context p r
@@ -26,6 +26,7 @@ instance Functor (Arith p r)
 instance Applicative (Arith p r)
 instance Monad (Arith p r)
 evalArith :: Arith p r a -> Context p r -> Either (Exception p r) a
+getPrecision :: Precision p => Arith p r (Maybe Int)
 
 data Signal
   = Clamped

@@ -1074,7 +1074,7 @@ isZero = return . Number.isZero
 logb :: (Precision p, Rounding r) => Decimal a b -> Arith p r (Decimal p r)
 logb Num { coefficient = c, exponent = e }
   | c == 0    = raiseSignal DivisionByZero Inf { sign = Neg }
-  | otherwise = round (fromInteger r)
+  | otherwise = round (fromInteger r :: Decimal PInfinite RoundHalfEven)
   where r = fromIntegral (numDigits c) - 1 + fromIntegral e :: Integer
 logb Inf{} = return Inf { sign = Pos }
 logb n@QNaN{} = return (coerce n)

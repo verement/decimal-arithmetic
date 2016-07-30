@@ -16,6 +16,8 @@ module Numeric.Decimal.Rounding
 
 import Prelude hiding (exponent)
 
+import Data.Coerce (coerce)
+
 import {-# SOURCE #-} Numeric.Decimal.Number
 import                Numeric.Decimal.Precision
 import {-# SOURCE #-} Numeric.Decimal.Arithmetic
@@ -34,7 +36,7 @@ data RoundingAlgorithm = RoundDown
 -- exceeds the precision of the result type
 class Rounding r where
   rounding :: r -> RoundingAlgorithm
-  round :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+  round    :: Precision p => Decimal a b -> Arith p r (Decimal p r)
 
 -- Required...
 
@@ -97,10 +99,11 @@ instance Rounding Round05Up where
 
 -- Implementations
 
-excessDigits :: Precision p => Decimal p r -> Arith p r (Maybe Int)
-excessDigits n@Num { coefficient = c } = result
-  where result = return (precision n >>= excess)
-        d = numDigits c
+excessDigits :: Precision p => Decimal a b -> Arith p r (Maybe Int)
+excessDigits Num { coefficient = c } = do
+  p <- getPrecision
+  return (p >>= excess)
+  where d = numDigits c
         excess p
           | d > p     = Just (d - p)
           | otherwise = Nothing
@@ -119,26 +122,26 @@ rounded f d n = raiseSignal Rounded =<< rounded' n'
         down = n { coefficient = q    , exponent = exponent n + fromIntegral d }
         up   = n { coefficient = q + 1, exponent = exponent n + fromIntegral d }
 
-roundDown :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+roundDown :: Precision p => Decimal a b -> Arith p r (Decimal p r)
 roundDown n = excessDigits n >>= roundDown'
-  where roundDown' Nothing  = return n
-        roundDown' (Just d) = rounded choice d n
+  where roundDown' Nothing  = return (coerce n)
+        roundDown' (Just d) = rounded choice d (coerce n)
 
         choice _h _q _r down _up = down
 
-roundHalfUp :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+roundHalfUp :: Precision p => Decimal a b -> Arith p r (Decimal p r)
 roundHalfUp n = excessDigits n >>= roundHalfUp'
-  where roundHalfUp' Nothing  = return n
-        roundHalfUp' (Just d) = rounded choice d n
+  where roundHalfUp' Nothing  = return (coerce n)
+        roundHalfUp' (Just d) = rounded choice d (coerce n)
 
         choice h _q r down up
           | r >= h    = up
           | otherwise = down
 
-roundHalfEven :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+roundHalfEven :: Precision p => Decimal a b -> Arith p r (Decimal p r)
 roundHalfEven n = excessDigits n >>= roundHalfEven'
-  where roundHalfEven' Nothing  = return n
-        roundHalfEven' (Just d) = rounded choice d n
+  where roundHalfEven' Nothing  = return (coerce n)
+        roundHalfEven' (Just d) = rounded choice d (coerce n)
 
         choice h q r down up = case r `Prelude.compare` h of
           LT -> down
@@ -146,46 +149,46 @@ roundHalfEven n = excessDigits n >>= roundHalfEven'
           EQ | even q    -> down
              | otherwise -> up
 
-roundCeiling :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+roundCeiling :: Precision p => Decimal a b -> Arith p r (Decimal p r)
 roundCeiling n = excessDigits n >>= roundCeiling'
-  where roundCeiling' Nothing  = return n
-        roundCeiling' (Just d) = rounded choice d n
+  where roundCeiling' Nothing  = return (coerce n)
+        roundCeiling' (Just d) = rounded choice d (coerce n)
 
         choice _h _q r down up
           | r == 0 || sign n == Neg = down
           | otherwise               = up
 
-roundFloor :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+roundFloor :: Precision p => Decimal a b -> Arith p r (Decimal p r)
 roundFloor n = excessDigits n >>= roundFloor'
-  where roundFloor' Nothing  = return n
-        roundFloor' (Just d) = rounded choice d n
+  where roundFloor' Nothing  = return (coerce n)
+        roundFloor' (Just d) = rounded choice d (coerce n)
 
         choice _h _q r down up
           | r == 0 || sign n == Pos = down
           | otherwise               = up
 
-roundHalfDown :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+roundHalfDown :: Precision p => Decimal a b -> Arith p r (Decimal p r)
 roundHalfDown n = excessDigits n >>= roundHalfDown'
-  where roundHalfDown' Nothing  = return n
-        roundHalfDown' (Just d) = rounded choice d n
+  where roundHalfDown' Nothing  = return (coerce n)
+        roundHalfDown' (Just d) = rounded choice d (coerce n)
 
         choice h _q r down up
           | r > h     = up
           | otherwise = down
 
-roundUp :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+roundUp :: Precision p => Decimal a b -> Arith p r (Decimal p r)
 roundUp n = excessDigits n >>= roundUp'
-  where roundUp' Nothing  = return n
-        roundUp' (Just d) = rounded choice d n
+  where roundUp' Nothing  = return (coerce n)
+        roundUp' (Just d) = rounded choice d (coerce n)
 
         choice _h _q r down up
           | r == 0    = down
           | otherwise = up
 
-round05Up :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+round05Up :: Precision p => Decimal a b -> Arith p r (Decimal p r)
 round05Up n = excessDigits n >>= round05Up'
-  where round05Up' Nothing  = return n
-        round05Up' (Just d) = rounded choice d n
+  where round05Up' Nothing  = return (coerce n)
+        round05Up' (Just d) = rounded choice d (coerce n)
 
         choice _h q r down up
           | r == 0           = down
