@@ -13,6 +13,7 @@ module Numeric.Decimal.Operation
        , compare
        , min
        , max
+       , power
        ) where
 
 import Prelude hiding (abs, compare, exp, max, min, subtract)
@@ -46,3 +47,5 @@ min      :: (Precision p, Rounding r)
          => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
 max      :: (Precision p, Rounding r)
          => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
+power    :: (FinitePrecision p, Rounding r)
+         => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)

@@ -33,6 +33,7 @@ module Numeric.Decimal.Number
        , isSubnormal
 
        , adjustedExponent
+       , integralValue
        ) where
 
 import Prelude hiding (exponent, round)
@@ -315,6 +316,8 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   logBase _  1 = zero
   logBase b  x = evalOp (join $ Op.divide <$> Op.ln x <*> Op.ln b)
 
+  x ** y = evalOp (x `Op.power` y)
+
   sin   = notyet "sin"
   cos   = notyet "cos"
   asin  = notyet "asin"
@@ -328,6 +331,8 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
 
 {- $doctest-Floating
 prop> realToFrac (pi :: ExtendedDecimal P16) == (pi :: Double)
+
+prop> y >= 0 ==> (x :: BasicDecimal) ** fromInteger y == x ^ y
 -}
 
 instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
@@ -539,3 +544,10 @@ adjustedExponent Num { coefficient = c, exponent = e } =
   e + fromIntegral (clength - 1)
   where clength = numDigits c :: Int
 adjustedExponent _ = error "adjustedExponent: not a finite number"
+
+integralValue :: Decimal a b -> Maybe Integer
+integralValue Num { sign = s, coefficient = c, exponent = e }
+  | e >= 0 = Just (signFunc s $ fromIntegral c * 10^e)
+  | r == 0 = Just (signFunc s $ fromIntegral q)
+  where (q, r) = c `quotRem` (10^(-e))
+integralValue _ = Nothing

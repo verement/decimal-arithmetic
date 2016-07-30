@@ -37,7 +37,7 @@ module Numeric.Decimal.Operation
          -- nextMinus
          -- nextPlus
          -- nextToward
-         -- power
+       , power
          -- quantize
        , reduce
          -- remainder
@@ -85,6 +85,7 @@ import qualified Prelude
 
 import Control.Monad (join)
 import Data.Coerce (coerce)
+import Data.Maybe (fromMaybe)
 
 import Numeric.Decimal.Arithmetic
 import Numeric.Decimal.Number hiding (isFinite, isNormal, isSubnormal, isZero)
@@ -877,6 +878,96 @@ minMax f x y = do
 
 withoutSign :: Decimal p r -> Decimal p r
 withoutSign n = n { sign = Pos }
+
+-- | 'power' takes two operands, and raises a number (the left-hand operand)
+-- to a power (the right-hand operand). If either operand is a /special value/
+-- then the general rules apply, except in certain cases.
+power :: (FinitePrecision p, Rounding r)
+      => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+power x@Num { coefficient = 0 } y@Num{}
+  | Number.isZero y     = invalidOperation qNaN
+  | Number.isNegative y = return infinity { sign = powerSign x y }
+  | otherwise           = return zero     { sign = powerSign x y }
+power x@Num{} y@Num{} = case integralValue y of
+  Just i  | i < 0               -> reciprocal x >>= \rx -> integralPower rx (-i)
+          | otherwise           ->                         integralPower  x   i
+  Nothing | Number.isPositive x -> ln x >>= multiply y >>= fmap coerce . exp
+          | otherwise           -> invalidOperation qNaN
+power x@Num{} y@Inf{}
+  | Number.isPositive x = return $ case sign y of
+      Pos -> infinity
+      Neg -> zero
+  | otherwise           = invalidOperation qNaN
+power x@Inf{} y@Num{}
+  | Number.isZero y     = return one
+  | Number.isPositive y = return infinity { sign = powerSign x y }
+  | otherwise           = return zero     { sign = powerSign x y }
+power Inf{} Inf { sign = s }
+  | s == Pos            = return infinity
+  | otherwise           = return zero
+power x@SNaN{} _        = invalidOperation x
+power _        y@SNaN{} = invalidOperation y
+power x@QNaN{} _        = return (coerce x)
+power _        y@QNaN{} = return (coerce y)
+
+powerSign :: Decimal a b -> Decimal c d -> Sign
+powerSign x y
+  | Number.isNegative x && fromMaybe False (odd <$> integralValue y) = Neg
+  | otherwise                                                        = Pos
+
+integralPower :: (Precision p, Rounding r)
+              => Decimal a b -> Integer -> Arith p r (Decimal p r)
+integralPower b e = integralPower' (return b) e one
+  where integralPower' :: (Precision p, Rounding r)
+                       => Arith p r (Decimal a b) -> Integer -> Decimal p r
+                       -> Arith p r (Decimal p r)
+        integralPower' _  0 r = return r
+        integralPower' mb e r
+          | odd e     = mb >>= \b -> multiply r b >>=
+                        integralPower'              (multiply b b) e'
+          | otherwise = integralPower' (mb >>= \b -> multiply b b) e' r
+          where e' = e `div` 2
+
+{- $doctest-power
+>>> op2 Op.power "2" "3"
+8
+
+>>> op2 Op.power "-2" "3"
+-8
+
+>>> op2 Op.power "2" "-3"
+0.125
+
+>>> op2 Op.power "1.7" "8"
+69.7575744
+
+>>> op2 Op.power "10" "0.301029996"
+2.00000000
+
+>>> op2 Op.power "Infinity" "-1"
+0
+
+>>> op2 Op.power "Infinity" "0"
+1
+
+>>> op2 Op.power "Infinity" "1"
+Infinity
+
+>>> op2 Op.power "-Infinity" "-1"
+-0
+
+>>> op2 Op.power "-Infinity" "0"
+1
+
+>>> op2 Op.power "-Infinity" "1"
+-Infinity
+
+>>> op2 Op.power "-Infinity" "2"
+Infinity
+
+>>> op2 Op.power "0" "0"
+NaN
+-}
 
 -- | 'reduce' takes one operand. It has the same semantics as the 'plus'
 -- operation, except that if the final result is finite it is reduced to its
