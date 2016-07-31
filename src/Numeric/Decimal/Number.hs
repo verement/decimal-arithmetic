@@ -36,7 +36,7 @@ module Numeric.Decimal.Number
        , integralValue
        ) where
 
-import Prelude hiding (exponent, round)
+import Prelude hiding (exponent)
 
 import Control.Monad (join)
 import Data.Char (isSpace)
@@ -443,7 +443,7 @@ flipSign n = n { sign = negateSign (sign n) }
 -- immediately rounding if necessary to the new precision using the new
 -- algorithm.
 cast :: (Precision p, Rounding r) => Decimal a b -> Decimal p r
-cast = evalOp . round . coerce
+cast = evalOp . roundDecimal
 
 -- | Cast a 'Decimal' to another rounding algorithm, maintaining the same
 -- precision. No new rounding occurs.

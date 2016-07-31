@@ -80,7 +80,7 @@ module Numeric.Decimal.Operation
        ) where
 
 import Prelude hiding (abs, compare, exp, exponent, isInfinite, isNaN, max, min,
-                       round, subtract)
+                       subtract)
 import qualified Prelude
 
 import Control.Monad (join)
@@ -107,7 +107,7 @@ roundingAlg = rounding . arithRounding
         arithRounding = undefined
 
 result :: (Precision p, Rounding r) => Decimal p r -> Arith p r (Decimal p r)
-result = round  -- ...
+result = roundDecimal  -- ...
 --  | maybe False (numDigits c >) (precision r) = undefined
 
 invalidOperation :: Decimal a b -> Arith p r (Decimal p r)
@@ -365,7 +365,7 @@ exp x@Num { sign = s, coefficient = c }
         subRounded :: Precision p
                    => Decimal (PPlus1 (PPlus1 p)) a
                    -> Arith p r (Decimal p RoundHalfEven)
-        subRounded = subArith . round
+        subRounded = subArith . roundDecimal
 
         result :: Decimal p a -> Arith p r (Decimal p a)
         result r = coerce <$> (raiseSignal Rounded =<< raiseSignal Inexact r')
@@ -488,7 +488,7 @@ ln x@Num { sign = s, coefficient = c, exponent = e }
         subRounded :: Precision p
                    => Decimal (PPlus1 (PPlus1 p)) a
                    -> Arith p r (Decimal p RoundHalfEven)
-        subRounded = subArith . round
+        subRounded = subArith . roundDecimal
 
         result :: Decimal p a -> Arith p r (Decimal p a)
         result r = coerce <$> (raiseSignal Rounded =<< raiseSignal Inexact r')
@@ -608,7 +608,7 @@ divide Num { sign = xs, coefficient = xc, exponent = xe }
         re = xe - (ye + adjust)
         answer
           | rem == 0  = return rn
-          | otherwise = round $ case (rem * 2) `Prelude.compare` dv of
+          | otherwise = roundDecimal $ case (rem * 2) `Prelude.compare` dv of
               LT -> rn { coefficient = rc * 10 + 1, exponent = re - 1 }
               EQ -> rn { coefficient = rc * 10 + 5, exponent = re - 1 }
               GT -> rn { coefficient = rc * 10 + 9, exponent = re - 1 }
@@ -1007,20 +1007,8 @@ quantize x@Num { coefficient = xc, exponent = xe } Num { exponent = ye }
 
         rc :: Rounding r => Arith p r Coefficient
         rc = let b      = 10^(ye - xe)
-                 bh     = b `div` 2
                  (q, r) = xc `quotRem` b
-                 q'     = q + 1
-                 d      = q `rem` 10
-                 s      = sign x
-             in getRounding >>= \ra -> return $ case ra of
-                  RoundHalfUp   | r >= bh                       -> q'
-                  RoundHalfEven | r >  bh || (r == bh && odd q) -> q'
-                  RoundHalfDown | r >  bh                       -> q'
-                  RoundCeiling  | r > 0 && s == Pos             -> q'
-                  RoundFloor    | r > 0 && s == Neg             -> q'
-                  RoundUp       | r > 0                         -> q'
-                  Round05Up     | r > 0 && (d == 0 || d == 5)   -> q'
-                  _                                             -> q
+             in getRounder >>= \rounder -> return (rounder (sign x) r b q)
 
 quantize Num{}      Inf{}    = invalidOperation qNaN
 quantize Inf{}      Num{}    = invalidOperation qNaN
@@ -1511,7 +1499,7 @@ isZero = return . Number.isZero
 logb :: (Precision p, Rounding r) => Decimal a b -> Arith p r (Decimal p r)
 logb Num { coefficient = c, exponent = e }
   | c == 0    = raiseSignal DivisionByZero Inf { sign = Neg }
-  | otherwise = round (fromInteger r :: Decimal PInfinite RoundHalfEven)
+  | otherwise = roundDecimal (fromInteger r :: Decimal PInfinite RoundHalfEven)
   where r = fromIntegral (numDigits c) - 1 + fromIntegral e :: Integer
 logb Inf{} = return Inf { sign = Pos }
 logb n@QNaN{} = return (coerce n)

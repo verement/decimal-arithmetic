@@ -12,6 +12,9 @@ module Numeric.Decimal.Rounding
        , RoundHalfDown
        , RoundUp
        , Round05Up
+
+       , getRounder
+       , roundDecimal
        ) where
 
 import Prelude hiding (exponent)
@@ -36,163 +39,138 @@ data RoundingAlgorithm = RoundDown
 -- | A rounding algorithm to use when the result of an arithmetic operation
 -- exceeds the precision of the result type
 class Rounding r where
-  rounding :: r -> RoundingAlgorithm
-  round    :: Precision p => Decimal a b -> Arith p r (Decimal p r)
+  rounding         :: r -> RoundingAlgorithm
+  roundCoefficient :: r -> Rounder
 
--- Required...
+type Remainder = Coefficient
+type Divisor   = Coefficient
 
--- | Round toward 0 (truncate)
+type Rounder = Sign -> Remainder -> Divisor -> Coefficient -> Coefficient
+
+getRounder :: Rounding r => Arith p r Rounder
+getRounder = ($ undefined) <$> getRounder'
+  where getRounder' :: Rounding r => Arith p r (r -> Rounder)
+        getRounder' = return roundCoefficient
+
+-- | Round a 'Decimal' to the precision of the arithmetic context using the
+-- rounding algorithm of the arithmetic context.
+roundDecimal :: (Precision p, Rounding r)
+             => Decimal a b -> Arith p r (Decimal p r)
+roundDecimal n@Num { sign = s, coefficient = c, exponent = e } = do
+  p <- getPrecision
+  case excessDigits c =<< p of
+    Just d -> do
+      rounder <- getRounder
+      let b      = 10 ^ d
+          (q, r) = c `quotRem` b
+          c'     = rounder s r b q
+          e'     = e + fromIntegral d
+          n'     = case excessDigits c' =<< p of
+            Nothing -> n { coefficient = c'          , exponent =      e' }
+            _       -> n { coefficient = c' `quot` 10, exponent = succ e' }
+          rounded :: Decimal p r -> Arith p r (Decimal p r)
+          rounded
+            | r /= 0    = raiseSignal Inexact
+            | otherwise = return
+      raiseSignal Rounded =<< rounded n'  -- XXX check for overflow
+
+    Nothing -> return (coerce n)
+
+  where excessDigits :: Coefficient -> Int -> Maybe Int
+        excessDigits c p | d > p     = Just (d - p)
+                         | otherwise = Nothing
+          where d = numDigits c :: Int
+
+roundDecimal n = return (coerce n)
+
+-- Required algorithms...
+
+-- | (Round toward 0; truncate.) The discarded digits are ignored; the result
+-- is unchanged.
 data RoundDown
 instance Rounding RoundDown where
   rounding _ = RoundDown
-  round = roundDown
+
+  roundCoefficient _ _ _ _ = id
 
 -- | If the discarded digits represent greater than or equal to half (0.5) of
--- the value of a one in the next left position then the value is rounded
--- up. If they represent less than half, the value is rounded down.
+-- the value of a one in the next left position then the result coefficient
+-- should be incremented by 1 (rounded up). Otherwise the discarded digits are
+-- ignored.
 data RoundHalfUp
 instance Rounding RoundHalfUp where
   rounding _ = RoundHalfUp
-  round = roundHalfUp
 
--- | If the discarded digits represent greater than half (0.5) of the value of
--- a one in the next left position then the value is rounded up. If they
--- represent less than half, the value is rounded down. If they represent
--- exactly half, the value is rounded to make its rightmost digit even.
+  roundCoefficient _ _ r v | r * 2 >= v = succ
+                           | otherwise  = id
+
+-- | If the discarded digits represent greater than half (0.5) the value of a
+-- one in the next left position then the result coefficient should be
+-- incremented by 1 (rounded up). If they represent less than half, then the
+-- result coefficient is not adjusted (that is, the discarded digits are
+-- ignored).
+--
+-- Otherwise (they represent exactly half) the result coefficient is unaltered
+-- if its rightmost digit is even, or incremented by 1 (rounded up) if its
+-- rightmost digit is odd (to make an even digit).
 data RoundHalfEven
 instance Rounding RoundHalfEven where
   rounding _ = RoundHalfEven
-  round = roundHalfEven
 
--- | Round toward +∞
+  roundCoefficient _ _ r v q = case (r * 2) `Prelude.compare` v of
+    GT         -> succ q
+    EQ | odd q -> succ q
+    _          ->      q
+
+-- | (Round toward +∞.) If all of the discarded digits are zero or if the
+-- /sign/ is 1 the result is unchanged. Otherwise, the result coefficient
+-- should be incremented by 1 (rounded up).
 data RoundCeiling
 instance Rounding RoundCeiling where
   rounding _ = RoundCeiling
-  round = roundCeiling
 
--- | Round toward −∞
+  roundCoefficient _ Pos r _ | r /= 0 = succ
+  roundCoefficient _ _   _ _          = id
+
+-- | (Round toward −∞.) If all of the discarded digits are zero or if the
+-- /sign/ is 0 the result is unchanged. Otherwise, the sign is 1 and the
+-- result coefficient should be incremented by 1.
 data RoundFloor
 instance Rounding RoundFloor where
   rounding _ = RoundFloor
-  round = roundFloor
 
--- Optional...
+  roundCoefficient _ Neg r _ | r /= 0 = succ
+  roundCoefficient _ _   _ _          = id
+
+-- Optional algorithms...
 
 -- | If the discarded digits represent greater than half (0.5) of the value of
--- a one in the next left position then the value is rounded up. If they
--- represent less than half or exactly half, the value is rounded down.
+-- a one in the next left position then the result coefficient should be
+-- incremented by 1 (rounded up). Otherwise (the discarded digits are 0.5 or
+-- less) the discarded digits are ignored.
 data RoundHalfDown
 instance Rounding RoundHalfDown where
   rounding _ = RoundHalfDown
-  round = roundHalfDown
 
--- | Round away from 0
+  roundCoefficient _ _ r v | r * 2 > v = succ
+                           | otherwise = id
+
+-- | (Round away from 0.) If all of the discarded digits are zero the result
+-- is unchanged. Otherwise, the result coefficient should be incremented by 1
+-- (rounded up).
 data RoundUp
 instance Rounding RoundUp where
   rounding _ = RoundUp
-  round = roundUp
 
--- | Round zero or five away from 0
+  roundCoefficient _ _ r _ | r /= 0     = succ
+                           | otherwise  = id
+
+-- | (Round zero or five away from 0.) The same as 'RoundUp', except that
+-- rounding up only occurs if the digit to be rounded up is 0 or 5, and after
+-- overflow the result is the same as for 'RoundDown'.
 data Round05Up
 instance Rounding Round05Up where
   rounding _ = Round05Up
-  round = round05Up
 
--- Implementations
-
-excessDigits :: Precision p => Decimal a b -> Arith p r (Maybe Int)
-excessDigits Num { coefficient = c } = do
-  p <- getPrecision
-  return (p >>= excess)
-  where d = numDigits c
-        excess p
-          | d > p     = Just (d - p)
-          | otherwise = Nothing
-excessDigits _ = return Nothing
-
-rounded :: (Coefficient -> Coefficient -> Coefficient ->
-            Decimal p r -> Decimal p r -> Decimal p r)
-        -> Int -> Decimal p r -> Arith p r (Decimal p r)
-rounded f d n = raiseSignal Rounded =<< rounded' n'
-  where rounded'
-          | r /= 0    = raiseSignal Inexact
-          | otherwise = return
-        p = 10 ^ d
-        (q, r) = coefficient n `quotRem` p
-        n' = f (p `quot` 2) q r down up
-        down = n { coefficient = q    , exponent = exponent n + fromIntegral d }
-        up   = n { coefficient = q + 1, exponent = exponent n + fromIntegral d }
-
-roundDown :: Precision p => Decimal a b -> Arith p r (Decimal p r)
-roundDown n = excessDigits n >>= roundDown'
-  where roundDown' Nothing  = return (coerce n)
-        roundDown' (Just d) = rounded choice d (coerce n)
-
-        choice _h _q _r down _up = down
-
-roundHalfUp :: Precision p => Decimal a b -> Arith p r (Decimal p r)
-roundHalfUp n = excessDigits n >>= roundHalfUp'
-  where roundHalfUp' Nothing  = return (coerce n)
-        roundHalfUp' (Just d) = rounded choice d (coerce n)
-
-        choice h _q r down up
-          | r >= h    = up
-          | otherwise = down
-
-roundHalfEven :: Precision p => Decimal a b -> Arith p r (Decimal p r)
-roundHalfEven n = excessDigits n >>= roundHalfEven'
-  where roundHalfEven' Nothing  = return (coerce n)
-        roundHalfEven' (Just d) = rounded choice d (coerce n)
-
-        choice h q r down up = case r `Prelude.compare` h of
-          LT -> down
-          GT -> up
-          EQ | even q    -> down
-             | otherwise -> up
-
-roundCeiling :: Precision p => Decimal a b -> Arith p r (Decimal p r)
-roundCeiling n = excessDigits n >>= roundCeiling'
-  where roundCeiling' Nothing  = return (coerce n)
-        roundCeiling' (Just d) = rounded choice d (coerce n)
-
-        choice _h _q r down up
-          | r == 0 || sign n == Neg = down
-          | otherwise               = up
-
-roundFloor :: Precision p => Decimal a b -> Arith p r (Decimal p r)
-roundFloor n = excessDigits n >>= roundFloor'
-  where roundFloor' Nothing  = return (coerce n)
-        roundFloor' (Just d) = rounded choice d (coerce n)
-
-        choice _h _q r down up
-          | r == 0 || sign n == Pos = down
-          | otherwise               = up
-
-roundHalfDown :: Precision p => Decimal a b -> Arith p r (Decimal p r)
-roundHalfDown n = excessDigits n >>= roundHalfDown'
-  where roundHalfDown' Nothing  = return (coerce n)
-        roundHalfDown' (Just d) = rounded choice d (coerce n)
-
-        choice h _q r down up
-          | r > h     = up
-          | otherwise = down
-
-roundUp :: Precision p => Decimal a b -> Arith p r (Decimal p r)
-roundUp n = excessDigits n >>= roundUp'
-  where roundUp' Nothing  = return (coerce n)
-        roundUp' (Just d) = rounded choice d (coerce n)
-
-        choice _h _q r down up
-          | r == 0    = down
-          | otherwise = up
-
-round05Up :: Precision p => Decimal a b -> Arith p r (Decimal p r)
-round05Up n = excessDigits n >>= round05Up'
-  where round05Up' Nothing  = return (coerce n)
-        round05Up' (Just d) = rounded choice d (coerce n)
-
-        choice _h q r down up
-          | r == 0           = down
-          | d == 0 || d == 5 = up  -- XXX overflow -> roundDown?
-          | otherwise        = down
-          where d = q `rem` 10
+  roundCoefficient _ _ r _ q | r /= 0 && rem q 10 `elem` [0, 5] = succ q
+                             | otherwise                        =      q

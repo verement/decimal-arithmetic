@@ -18,7 +18,7 @@ module Numeric.Decimal.Conversion
        , toNumber
        ) where
 
-import Prelude hiding (exponent, round)
+import Prelude hiding (exponent)
 
 import Control.Applicative ((<|>))
 import Data.Char (isDigit, digitToInt, toLower, toUpper)
