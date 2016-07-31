@@ -320,11 +320,14 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
 
   sin   = notyet "sin"
   cos   = notyet "cos"
+
   asin  = notyet "asin"
   acos  = notyet "acos"
   atan  = notyet "atan"
+
   sinh  = notyet "sinh"
   cosh  = notyet "cosh"
+
   asinh = notyet "asinh"
   acosh = notyet "acosh"
   atanh = notyet "atanh"
@@ -499,7 +502,9 @@ isSubnormal n
   | otherwise                    = False
 
 -- | If the argument is 'False', return a 'Decimal' value zero; if 'True',
--- return the value one.
+-- return the value one. This is basically an optimized @toEnum . fromEnum@ to
+-- support an all-decimal usage of the operations from
+-- "Numeric.Decimal.Operation" that return a 'Bool'.
 fromBool :: Bool -> Decimal p r
 fromBool False = zero
 fromBool True  = one

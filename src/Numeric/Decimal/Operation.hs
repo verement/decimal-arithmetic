@@ -579,7 +579,8 @@ log10 n = coerce <$> invalidOperation n
 Infinity
 -}
 
--- | 'divide' takes two operands. If either operand is a /special value/ then the general rules apply.
+-- | 'divide' takes two operands. If either operand is a /special value/ then
+-- the general rules apply.
 --
 -- Otherwise, if the divisor is zero then either the Division undefined
 -- condition is raised (if the dividend is zero) and the result is NaN, or the
@@ -596,7 +597,7 @@ divide :: (FinitePrecision p, Rounding r)
 divide dividend@Num{ sign = xs } Num { coefficient = 0, sign = ys }
   | Number.isZero dividend = invalidOperation qNaN
   | otherwise              = raiseSignal DivisionByZero
-                        infinity { sign = xorSigns xs ys }
+                             infinity { sign = xorSigns xs ys }
 divide Num { sign = xs, coefficient = xc, exponent = xe }
        Num { sign = ys, coefficient = yc, exponent = ye } = quotient
 
@@ -874,7 +875,6 @@ minMax f x y = do
     Num { sign = Pos } -> (y, x)
     Num { sign = Neg } -> (x, y)
     nan -> let nan' = coerce nan in (nan', nan')
-
 
 withoutSign :: Decimal p r -> Decimal p r
 withoutSign n = n { sign = Pos }

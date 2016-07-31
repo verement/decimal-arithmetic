@@ -262,9 +262,9 @@ clearFlags :: Signals -> Arith p r ()
 clearFlags sigs = modify $ \ctx -> ctx { flags = unsignal sigs (flags ctx) }
 
 -- | A trap handler function may return a substitute result for the operation
--- that caused the exceptional condition, or it may call 'throwError' to abort
--- the arithmetic computation (or pass control to an enclosing 'catchError'
--- handler).
+-- that caused the exceptional condition, or it may call 'throwError' to pass
+-- control to an enclosing 'catchError' handler (or abort the arithmetic
+-- computation).
 type TrapHandler p r = Exception p r -> Arith p r (Decimal p r)
 
 -- | Evaluate an arithmetic computation within a modified context that enables
