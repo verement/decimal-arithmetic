@@ -22,6 +22,7 @@ import {-# SOURCE #-} Numeric.Decimal.Number
 import                Numeric.Decimal.Precision
 import {-# SOURCE #-} Numeric.Decimal.Arithmetic
 
+-- | A value representation of a rounding algorithm (cf. 'Rounding').
 data RoundingAlgorithm = RoundDown
                        | RoundHalfUp
                        | RoundHalfEven
@@ -30,7 +31,7 @@ data RoundingAlgorithm = RoundDown
                        | RoundHalfDown
                        | RoundUp
                        | Round05Up
-                       deriving (Eq, Enum)
+                       deriving Eq
 
 -- | A rounding algorithm to use when the result of an arithmetic operation
 -- exceeds the precision of the result type

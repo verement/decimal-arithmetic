@@ -15,7 +15,8 @@ module Numeric.Decimal.Arithmetic
        , newContext
        , flags
        , getPrecision
-       -- , getRounding
+       , getRounding
+       , RoundingAlgorithm(..)
 
          -- *** Default contexts
          -- $default-contexts

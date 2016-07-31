@@ -38,7 +38,7 @@ module Numeric.Decimal.Operation
          -- nextPlus
          -- nextToward
        , power
-         -- quantize
+       , quantize
        , reduce
          -- remainder
          -- remainderNear
@@ -967,6 +967,114 @@ Infinity
 
 >>> op2 Op.power "0" "0"
 NaN
+-}
+
+-- | 'quantize' takes two operands. If either operand is a /special value/
+-- then the general rules apply, except that if either operand is infinite and
+-- the other is finite an Invalid operation condition is raised and the result
+-- is NaN, or if both are infinite then the result is the first operand.
+--
+-- Otherwise (both operands are finite), 'quantize' returns the number which
+-- is equal in value (except for any rounding) and sign to the first
+-- (left-hand) operand and which has an /exponent/ set to be equal to the
+-- exponent of the second (right-hand) operand.
+--
+-- The /coefficient/ of the result is derived from that of the left-hand
+-- operand. It may be rounded using the current /rounding/ setting (if the
+-- /exponent/ is being increased), multiplied by a positive power of ten (if
+-- the /exponent/ is being decreased), or is unchanged (if the /exponent/ is
+-- already equal to that of the right-hand operand).
+--
+-- Unlike other operations, if the length of the /coefficient/ after the
+-- quantize operation would be greater than /precision/ then an Invalid
+-- operation condition is raised. This guarantees that, unless there is an
+-- error condition, the /exponent/ of the result of a quantize is always equal
+-- to that of the right-hand operand.
+--
+-- Also unlike other operations, quantize will never raise Underflow, even if
+-- the result is subnormal and inexact.
+quantize :: (Precision p, Rounding r)
+         => Decimal p r -> Decimal a b -> Arith p r (Decimal p r)
+quantize x@Num { coefficient = xc, exponent = xe } Num { exponent = ye }
+  | xe > ye   = result x { coefficient = xc * 10^(xe - ye), exponent = ye }
+  | xe < ye   = rc >>= \c -> return x { coefficient = c, exponent = ye }
+  | otherwise = return x
+
+  where result :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+        result x = getPrecision >>= \p -> case numDigits (coefficient x) of
+          n | maybe False (n >) p -> invalidOperation x
+          _                       -> return x
+
+        rc :: Rounding r => Arith p r Coefficient
+        rc = let b      = 10^(ye - xe)
+                 bh     = b `div` 2
+                 (q, r) = xc `quotRem` b
+                 q'     = q + 1
+                 d      = q `rem` 10
+                 s      = sign x
+             in getRounding >>= \ra -> return $ case ra of
+                  RoundHalfUp   | r >= bh                       -> q'
+                  RoundHalfEven | r >  bh || (r == bh && odd q) -> q'
+                  RoundHalfDown | r >  bh                       -> q'
+                  RoundCeiling  | r > 0 && s == Pos             -> q'
+                  RoundFloor    | r > 0 && s == Neg             -> q'
+                  RoundUp       | r > 0                         -> q'
+                  Round05Up     | r > 0 && (d == 0 || d == 5)   -> q'
+                  _                                             -> q
+
+quantize Num{}      Inf{}    = invalidOperation qNaN
+quantize Inf{}      Num{}    = invalidOperation qNaN
+quantize n@Inf{}    Inf{}    = return n
+quantize n@SNaN{}   _        = invalidOperation n
+quantize _          n@SNaN{} = invalidOperation n
+quantize n@QNaN{}   _        = return         n
+quantize _          n@QNaN{} = return (coerce n)
+
+{- $doctest-quantize
+>>> op2 Op.quantize "2.17" "0.001"
+2.170
+
+>>> op2 Op.quantize "2.17" "0.01"
+2.17
+
+>>> op2 Op.quantize "2.17" "0.1"
+2.2
+
+>>> op2 Op.quantize "2.17" "1e+0"
+2
+
+>>> op2 Op.quantize "2.17" "1e+1"
+0E+1
+
+>>> op2 Op.quantize "-Inf" "Infinity"
+-Infinity
+
+>>> op2 Op.quantize "2" "Infinity"
+NaN
+
+>>> op2 Op.quantize "-0.1" "1"
+-0
+
+>>> op2 Op.quantize "-0" "1e+5"
+-0E+5
+
+>>> op2 Op.quantize "+35236450.6" "1e-2"
+NaN
+
+>>> op2 Op.quantize "-35236450.6" "1e-2"
+NaN
+
+>>> op2 Op.quantize "217" "1e-1"
+217.0
+
+>>> op2 Op.quantize "217" "1e+0"
+217
+
+>>> op2 Op.quantize "217" "1e+1"
+2.2E+2
+
+>>> op2 Op.quantize "217" "1e+2"
+2E+2
 -}
 
 -- | 'reduce' takes one operand. It has the same semantics as the 'plus'
