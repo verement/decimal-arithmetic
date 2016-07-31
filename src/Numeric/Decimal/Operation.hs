@@ -460,34 +460,10 @@ ln x@Num { sign = s, coefficient = c, exponent = e }
         subLn x = do
           let fe = fromIntegral (-(numDigits c - 1)) :: Exponent
               r  = fromIntegral (e - fe) :: Decimal PInfinite RoundHalfEven
-          lnf  <- taylor x { exponent = fe }
-          ln10 <- taylor ten
-          add lnf =<< multiply ln10 r
+          lnf <- taylorLn x { exponent = fe }
+          add lnf =<< multiply r =<< ln10
 
-        taylor :: FinitePrecision p => Decimal a b
-               -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
-        taylor x = do
-          num <- x `subtract` one
-          den <- x `add` one
-          multiply two =<< sum =<< num `divide` den
-
-        sum :: FinitePrecision p => Decimal p RoundHalfEven
-            -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
-        sum b = multiply b b >>= \b2 -> sum' b b b2 one
-          where sum' :: FinitePrecision p
-                     => Decimal p RoundHalfEven
-                     -> Decimal p RoundHalfEven
-                     -> Decimal p RoundHalfEven
-                     -> Decimal PInfinite RoundHalfEven
-                     -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
-                sum' s m b n = do
-                  m' <- multiply m b
-                  n' <- subArith (add n two)
-                  s' <- add s =<< divide m' n'
-                  if s' == s then return s' else sum' s' m' b n'
-
-        subRounded :: Precision p
-                   => Decimal (PPlus1 (PPlus1 p)) a
+        subRounded :: Precision p => Decimal (PPlus1 (PPlus1 p)) a
                    -> Arith p r (Decimal p RoundHalfEven)
         subRounded = subArith . roundDecimal
 
@@ -498,6 +474,43 @@ ln x@Num { sign = s, coefficient = c, exponent = e }
 ln n@Inf { sign = Pos } = return (coerce n)
 ln n@QNaN{} = return (coerce n)
 ln n = coerce <$> invalidOperation n
+
+taylorLn :: FinitePrecision p => Decimal a b
+         -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+taylorLn x = do
+  num <- x `subtract` one
+  den <- x `add`      one
+  multiply two =<< sum =<< num `divide` den
+
+    where sum :: FinitePrecision p => Decimal p RoundHalfEven
+              -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+          sum b = multiply b b >>= \b2 -> sum' b b b2 one
+
+            where sum' :: FinitePrecision p
+                       => Decimal p RoundHalfEven
+                       -> Decimal p RoundHalfEven
+                       -> Decimal p RoundHalfEven
+                       -> Decimal PInfinite RoundHalfEven
+                       -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+                  sum' s m b n = do
+                    m' <- multiply m b
+                    n' <- subArith (add n two)
+                    s' <- add s =<< divide m' n'
+                    if s' == s then return s' else sum' s' m' b n'
+
+ln10 :: FinitePrecision p => Arith p r (Decimal p RoundHalfEven)
+ln10 = getPrecision >>= \(Just p) ->
+  if p <= 50 then return fastLn10 else slowLn10
+
+  where fastLn10 :: FinitePrecision p => Decimal p RoundHalfEven
+        fastLn10 = 2.3025850929940456840179914546843642076011014886288
+
+        slowLn10 :: FinitePrecision p => Arith p r (Decimal p RoundHalfEven)
+        slowLn10 = subArith (taylorLn ten) >>= subRound
+
+          where subRound :: Precision p => Decimal (PPlus1 (PPlus1 p)) a
+                         -> Arith p r (Decimal p RoundHalfEven)
+                subRound = subArith . roundDecimal
 
 {- $doctest-ln
 >>> op1 Op.ln "0"
@@ -541,7 +554,7 @@ log10 x@Num { sign = s, coefficient = c, exponent = e }
   | s == Pos = getPrecision >>= \prec -> case powerOfTen c e of
       Just p | maybe True (numDigits pc <=) prec -> return (fromInteger p)
         where pc = fromInteger (Prelude.abs p) :: Coefficient
-      _ -> subArith (join $ divide <$> ln x <*> ln ten) >>= result
+      _ -> subArith (join $ divide <$> ln x <*> ln10) >>= result
 
   where powerOfTen :: Coefficient -> Exponent -> Maybe Integer
         powerOfTen c e
