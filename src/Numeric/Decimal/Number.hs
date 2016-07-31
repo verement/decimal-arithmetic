@@ -246,7 +246,7 @@ instance (FinitePrecision p, Rounding r) => Fractional (Decimal p r) where
   x / y = evalOp (x `Op.divide` y)
   fromRational r = let n = fromInteger (numerator   r) :: GeneralDecimal
                        d = fromInteger (denominator r) :: GeneralDecimal
-                   in coerce n / coerce d
+                   in evalOp (n `Op.divide` d)
 
 {- $doctest-Fractional
 prop> (4.14 :: Decimal P2 RoundHalfUp)   == 4.1
