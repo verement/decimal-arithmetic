@@ -44,7 +44,7 @@ module Numeric.Decimal.Operation
          -- remainderNear
          -- roundToIntegralExact
          -- roundToIntegralValue
-         -- squareRoot
+       , squareRoot
 
          -- * Miscellaneous operations
          -- $miscellaneous-operations
@@ -85,6 +85,7 @@ import qualified Prelude
 
 import Control.Monad (join)
 import Data.Coerce (coerce)
+import Data.List (find)
 import Data.Maybe (fromMaybe)
 
 import Numeric.Decimal.Arithmetic
@@ -1094,6 +1095,109 @@ reduce n = reduce' <$> plus n
 
 >>> op1 Op.reduce "0.00"
 0
+-}
+
+-- | 'squareRoot' takes one operand. If the operand is a /special value/ then
+-- the general rules apply.
+--
+-- Otherwise, the ideal exponent of the result is defined to be half the
+-- exponent of the operand (rounded to an integer, towards -Infinity, if
+-- necessary) and then:
+--
+-- If the operand is less than zero an Invalid operation condition is raised.
+--
+-- If the operand is greater than zero, the result is the square root of the
+-- operand. If no rounding is necessary (the exact result requires /precision/
+-- digits or fewer) then the the coefficient and exponent giving the correct
+-- value and with the exponent closest to the ideal exponent is used. If the
+-- result must be inexact, it is rounded using the /round-half-even/ algorithm
+-- and the coefficient will have exactly /precision/ digits (unless the result
+-- is subnormal), and the exponent will be set to maintain the correct value.
+--
+-- Otherwise (the operand is equal to zero), the result will be the zero with
+-- the same sign as the operand and with the ideal exponent.
+squareRoot :: FinitePrecision p
+           => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
+squareRoot n@Num { sign = s, coefficient = c, exponent = e }
+  | c == 0   = return n { exponent = idealExp }
+  | s == Pos = subResult >>= subRounded >>= result
+
+  where idealExp = e `div` 2 :: Exponent
+
+        reduced :: Decimal p r -> Decimal p r
+        reduced n@Num { coefficient = c, exponent = e }
+          | e < idealExp = case bd of
+              Just (b, (q, _)) -> n { coefficient = q, exponent = e + b }
+              Nothing          -> n
+          | e > idealExp = n { coefficient = c * 10^d, exponent = idealExp }
+          where d  = Prelude.abs (e - idealExp)
+                bd = find (\(_, (_, r)) -> r == 0) ds
+                ds = map (\d -> (d, c `quotRem` (10^d))) [d, d - 1 .. 1]
+        reduced n = n
+
+        subResult :: FinitePrecision p
+                  => Arith p r (Decimal (PPlus1 (PPlus1 p)) RoundHalfEven)
+        subResult = subArith (babylonian approx)
+
+        subRounded :: Precision p
+                   => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
+        subRounded = subArith . roundDecimal
+
+        exactness :: Decimal a b -> Arith p r (Decimal PInfinite RoundHalfEven)
+        exactness r = subArith (multiply r r >>= compare n)
+
+        result :: Decimal p a -> Arith p r (Decimal p a)
+        result r = do
+          e <- exactness r
+          if Number.isZero e
+            then return (reduced r)
+            else let r' = coerce r
+                 in coerce <$> (raiseSignal Rounded =<< raiseSignal Inexact r')
+
+        approx :: Decimal p r
+        approx | even ae   = n { coefficient = 2, exponent =  ae      `quot` 2 }
+               | otherwise = n { coefficient = 6, exponent = (ae - 1) `quot` 2 }
+          where ae = adjustedExponent n
+
+        babylonian :: FinitePrecision p => Decimal p RoundHalfEven
+                   -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
+        babylonian x = do
+          x' <- multiply oneHalf =<< add x =<< n `divide` x
+          if x' == x then return x' else babylonian x'
+
+squareRoot n@Inf { sign = Pos } = return (coerce n)
+squareRoot n@QNaN{}             = return (coerce n)
+squareRoot n                    = coerce <$> invalidOperation n
+
+{- $doctest-squareRoot
+>>> op1 Op.squareRoot "0"
+0
+
+>>> op1 Op.squareRoot "-0"
+-0
+
+This example appears to contradict the specification that the resulting
+coefficient will have exactly /precision/ digits; awaiting clarification.
+<<< op1 Op.squareRoot "0.39"
+0.62449980
+
+>>> op1 Op.squareRoot "100"
+10
+
+>>> op1 Op.squareRoot "1"
+1
+
+>>> op1 Op.squareRoot "1.0"
+1.0
+
+>>> op1 Op.squareRoot "1.00"
+1.0
+
+>>> op1 Op.squareRoot "7"
+2.64575131
+
+>>> op1 Op.squareRoot "10"
+3.16227766
 -}
 
 -- $miscellaneous-operations

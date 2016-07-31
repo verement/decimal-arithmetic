@@ -318,6 +318,8 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
 
   x ** y = evalOp (x `Op.power` y)
 
+  sqrt = castRounding . evalOp . Op.squareRoot
+
   sin   = notyet "sin"
   cos   = notyet "cos"
 
@@ -336,6 +338,8 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
 prop> realToFrac (pi :: ExtendedDecimal P16) == (pi :: Double)
 
 prop> y >= 0 ==> (x :: BasicDecimal) ** fromInteger y == x ^ y
+
+prop> isFinite x && x >= 0 ==> coefficient (sqrt (x * x) - (x :: ExtendedDecimal P16)) <= 1
 -}
 
 instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where

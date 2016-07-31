@@ -14,6 +14,7 @@ module Numeric.Decimal.Operation
        , min
        , max
        , power
+       , squareRoot
        ) where
 
 import Prelude hiding (abs, compare, exp, max, min, subtract)
@@ -49,3 +50,5 @@ max      :: (Precision p, Rounding r)
          => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
 power    :: (FinitePrecision p, Rounding r)
          => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+squareRoot :: FinitePrecision p
+           => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
