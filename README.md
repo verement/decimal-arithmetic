@@ -10,5 +10,5 @@ Mike Cowlishaw's [General Decimal Arithmetic][].
 
   [General Decimal Arithmetic]: http://speleotrove.com/decimal/
 
-While usable, the implementation is currently in its infancy. Additional
-operations and possible API changes are planned.
+While currently usable, the implementation is still under development.
+Additional operations and possible API changes are planned.
