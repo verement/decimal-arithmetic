@@ -1,9 +1,9 @@
 
 name:                decimal-arithmetic
-version:             0.3.0.0
+version:             0.4.0.0
 
-synopsis:            An implementation of Mike Cowlishaw's
-                     General Decimal Arithmetic Specification
+synopsis:            An implementation of the General Decimal Arithmetic
+                     Specification
 
 description:         This package provides an implementation of the General
                      Decimal Arithmetic Specification by Mike Cowlishaw.
