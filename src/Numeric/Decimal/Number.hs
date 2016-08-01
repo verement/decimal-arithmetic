@@ -39,14 +39,15 @@ module Numeric.Decimal.Number
 import Prelude hiding (exponent)
 
 import Control.Monad (join)
+import Data.Bits (Bits(..), FiniteBits(..))
 import Data.Char (isSpace)
 import Data.Coerce (coerce)
 import Data.Ratio (numerator, denominator, (%))
 import Numeric.Natural (Natural)
 import Text.ParserCombinators.ReadP (readP_to_S)
 
-import {-# SOURCE #-} Numeric.Decimal.Conversion
 import {-# SOURCE #-} Numeric.Decimal.Arithmetic
+import {-# SOURCE #-} Numeric.Decimal.Conversion
 import                Numeric.Decimal.Precision
 import                Numeric.Decimal.Rounding
 
@@ -127,7 +128,7 @@ instance Precision p => Precision (Decimal p r) where
     where decimalPrecision :: Decimal p r -> p
           decimalPrecision = undefined
 
-evalOp :: (Precision p, Rounding r) => Arith p r (Decimal p r) -> Decimal p r
+evalOp :: Arith p r (Decimal p r) -> Decimal p r
 evalOp op = either exceptionResult id $ evalArith op newContext
 
 type GeneralDecimal = Decimal PInfinite RoundHalfEven
@@ -410,6 +411,48 @@ prop> isNegativeZero (read "-0" :: BasicDecimal) == True
 prop> isNegativeZero (read "+0" :: BasicDecimal) == False
 prop> x /= 0 ==> isNegativeZero (x :: BasicDecimal) == False
 -}
+
+-- | The 'Bits' instance makes use of the logical operations from the
+-- /General Decimal Arithmetic Specification/ using a /digit-wise/
+-- representation of bits where the /sign/ is non-negative, the /exponent/ is
+-- 0, and each decimal digit of the /coefficient/ must be either 0 or 1.
+instance FinitePrecision p => Bits (Decimal p r) where
+  x  .&.  y = evalOp (x `Op.and` y)
+  x  .|.  y = evalOp (x `Op.or`  y)
+  x `xor` y = evalOp (x `Op.xor` y)
+
+  complement = evalOp . Op.invert
+
+  shift  x i = evalOp $ Op.shift  x (fromIntegral i :: GeneralDecimal)
+  rotate x i = evalOp $ Op.rotate x (fromIntegral i :: GeneralDecimal)
+
+  zeroBits = zero
+
+  bit i | i >= 0 && i < finiteBitSize x = x
+        | otherwise                     = zeroBits
+    where x = coerce zero { coefficient = 10 ^ i }
+
+  testBit x@Num { sign = Pos, coefficient = c, exponent = 0 } i
+    | i >= 0 && i < finiteBitSize x = (c `quot` 10 ^ i) `rem` 10 == 1
+  testBit _ _ = False
+
+  bitSizeMaybe = precision
+  bitSize      = finiteBitSize
+
+  isSigned _ = False
+
+  popCount Num { sign = Pos, coefficient = c, exponent = 0 } = popCount' c 0
+    where popCount' :: Coefficient -> Int -> Int
+          popCount' 0 c = c
+          popCount' x c = case d of
+            0 -> popCount' x'         c
+            1 -> popCount' x' $! succ c
+            _ -> 0
+            where (x', d) = x `quotRem` 10
+  popCount _ = 0
+
+instance FinitePrecision p => FiniteBits (Decimal p r) where
+  finiteBitSize x = let Just p = precision x in p
 
 -- | A 'Decimal' representing the value zero
 zero :: Decimal p r

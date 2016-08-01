@@ -15,9 +15,15 @@ module Numeric.Decimal.Operation
        , max
        , power
        , squareRoot
+       , and
+       , or
+       , xor
+       , invert
+       , shift
+       , rotate
        ) where
 
-import Prelude hiding (abs, compare, exp, max, min, subtract)
+import Prelude hiding (abs, and, compare, exp, max, min, or, subtract)
 
 import {-# SOURCE #-} Numeric.Decimal.Arithmetic
 import {-# SOURCE #-} Numeric.Decimal.Number
@@ -52,3 +58,11 @@ power    :: (FinitePrecision p, Rounding r)
          => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 squareRoot :: FinitePrecision p
            => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
+
+and    :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+or     :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+xor    :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+invert :: FinitePrecision p => Decimal a b -> Arith p r (Decimal p r)
+shift  :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+rotate :: FinitePrecision p
+       => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
