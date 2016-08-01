@@ -49,7 +49,7 @@ module Numeric.Decimal.Operation
          -- * Miscellaneous operations
          -- $miscellaneous-operations
 
-         -- and
+       , and
        , canonical
        , class_, Class(..), Sign(..), NumberClass(..), NaNClass(..)
          -- compareTotal
@@ -58,7 +58,7 @@ module Numeric.Decimal.Operation
        , copyAbs
        , copyNegate
        , copySign
-         -- invert
+       , invert
        , isCanonical
        , isFinite
        , isInfinite
@@ -70,23 +70,26 @@ module Numeric.Decimal.Operation
        , isSubnormal
        , isZero
        , logb
-         -- or
+       , or
        , radix
          -- rotate
        , sameQuantum
          -- scaleb
        , shift
-         -- xor
+       , xor
        ) where
 
-import Prelude hiding (abs, compare, exp, exponent, isInfinite, isNaN, max, min,
-                       subtract)
+import Prelude hiding (abs, and, compare, exp, exponent, isInfinite, isNaN,
+                       max, min, or, subtract)
 import qualified Prelude
 
 import Control.Monad (join)
+import Data.Bits (complement, setBit, testBit, zeroBits, (.&.), (.|.))
 import Data.Coerce (coerce)
 import Data.List (find)
 import Data.Maybe (fromMaybe)
+
+import qualified Data.Bits as Bits
 
 import Numeric.Decimal.Arithmetic
 import Numeric.Decimal.Number hiding (isFinite, isNormal, isSubnormal, isZero)
@@ -1219,11 +1222,176 @@ coefficient will have exactly /precision/ digits; awaiting clarification.
 -- including non-numeric comparisons, sign and other manipulations, and
 -- logical operations.
 --
+-- The logical operations ('and', 'invert', 'or', and 'xor') take
+-- /logical operands/, which are finite numbers with a /sign/ of 0, an
+-- /exponent/ of 0, and a /coefficient/ whose digits must all be either 0 or
+-- 1. The length of the result will be at most /precision/ digits (all of
+-- which will be either 0 or 1); operands are truncated on the left or padded
+-- with zeros on the left as necessary. The result of a logical operation is
+-- never rounded and the only /flag/ that might be set is /invalid-operation/
+-- (set if an operand is not a valid logical operand).
+--
 -- Some operations return a boolean value that is described as 0 or 1 in the
 -- documentation below. For reasons of efficiency, and as permitted by the
 -- /General Decimal Arithmetic Specification/, these operations return a
 -- 'Bool' in this implementation, but can be converted to 'Decimal' via
 -- 'fromBool'.
+
+data Logical = Logical { bits :: Integer, bitLength :: Int }
+
+toLogical :: Decimal a b -> Maybe Logical
+toLogical Num { sign = Pos, coefficient = c, exponent = 0 } =
+  getBits c Logical { bits = zeroBits, bitLength = 0 }
+
+  where getBits :: Coefficient -> Logical -> Maybe Logical
+        getBits 0 g = return g
+        getBits c g@Logical { bits = b, bitLength = l } = case d of
+          0 -> getBits c' g {                    bitLength = succ l }
+          1 -> getBits c' g { bits = setBit b l, bitLength = succ l }
+          _ -> Nothing
+          where (c', d) = c `quotRem` 10
+
+toLogical _ = Nothing
+
+fromLogical :: Logical -> Decimal a b
+fromLogical Logical { bits = b, bitLength = l } =
+  Num { sign = Pos, coefficient = fromBits 0 1 0, exponent = 0 }
+
+  where fromBits :: Int -> Coefficient -> Coefficient -> Coefficient
+        fromBits i r c
+          | i == l      = c
+          | testBit b i = fromBits i' r' (c + r)
+          | otherwise   = fromBits i' r'  c
+          where i' = succ i
+                r' = r * 10
+
+-- | 'and' is a logical operation which takes two logical operands. The result
+-- is the digit-wise /and/ of the two operands; each digit of the result is
+-- the logical and of the corresponding digits of the operands, aligned at the
+-- least-significant digit. A result digit is 1 if both of the corresponding
+-- operand digits are 1; otherwise it is 0.
+and :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+and x y = case (toLogical x, toLogical y) of
+  (Just lx, Just ly) -> getPrecision >>= \p ->
+    let m = Prelude.min (bitLength lx) (bitLength ly)
+        z = Logical { bits = bits lx .&. bits ly
+                    , bitLength = maybe m (Prelude.min m) p }
+    in return (fromLogical z)
+  _ -> invalidOperation qNaN
+
+{- $doctest-and
+>>> op2 Op.and "0" "0"
+0
+
+>>> op2 Op.and "0" "1"
+0
+
+>>> op2 Op.and "1" "0"
+0
+
+>>> op2 Op.and "1" "1"
+1
+
+>>> op2 Op.and "1100" "1010"
+1000
+
+>>> op2 Op.and "1111" "10"
+10
+-}
+
+-- | 'or' is a logical operation which takes two logical operands. The result
+-- is the digit-wise /inclusive or/ of the two operands; each digit of the
+-- result is the logical or of the corresponding digits of the operands,
+-- aligned at the least-significant digit. A result digit is 1 if either or
+-- both of the corresponding operand digits is 1; otherwise it is 0.
+or :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+or x y = case (toLogical x, toLogical y) of
+  (Just lx, Just ly) -> getPrecision >>= \p ->
+    let m = Prelude.max (bitLength lx) (bitLength ly)
+        z = Logical { bits = bits lx .|. bits ly
+                    , bitLength = maybe m (Prelude.min m) p }
+    in return (fromLogical z)
+  _ -> invalidOperation qNaN
+
+{- $doctest-or
+>>> op2 Op.or "0" "0"
+0
+
+>>> op2 Op.or "0" "1"
+1
+
+>>> op2 Op.or "1" "0"
+1
+
+>>> op2 Op.or "1" "1"
+1
+
+>>> op2 Op.or "1100" "1010"
+1110
+
+>>> op2 Op.or "1110" "10"
+1110
+-}
+
+-- | 'xor' is a logical operation which takes two logical operands. The result
+-- is the digit-wise /exclusive or/ of the two operands; each digit of the
+-- result is the logical exclusive-or of the corresponding digits of the
+-- operands, aligned at the least-significant digit. A result digit is 1 if
+-- one of the corresponding operand digits is 1 and the other is 0; otherwise
+-- it is 0.
+xor :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+xor x y = case (toLogical x, toLogical y) of
+  (Just lx, Just ly) -> getPrecision >>= \p ->
+    let m = Prelude.max (bitLength lx) (bitLength ly)
+        z = Logical { bits = bits lx `Bits.xor` bits ly
+                    , bitLength = maybe m (Prelude.min m) p }
+    in return (fromLogical z)
+  _ -> invalidOperation qNaN
+
+{- $doctest-xor
+>>> op2 Op.xor "0" "0"
+0
+
+>>> op2 Op.xor "0" "1"
+1
+
+>>> op2 Op.xor "1" "0"
+1
+
+>>> op2 Op.xor "1" "1"
+0
+
+>>> op2 Op.xor "1100" "1010"
+110
+
+>>> op2 Op.xor "1111" "10"
+1101
+-}
+
+-- | 'invert' is a logical operation which takes one logical operand. The
+-- result is the digit-wise /inversion/ of the operand; each digit of the
+-- result is the inverse of the corresponding digit of the operand. A result
+-- digit is 1 if the corresponding operand digit is 0; otherwise it is 0.
+invert :: FinitePrecision p => Decimal a b -> Arith p r (Decimal p r)
+invert x = case toLogical x of
+  Just lx -> getPrecision >>= \(Just p) ->
+    let z = Logical { bits = complement (bits lx), bitLength = p }
+    in return (fromLogical z)
+  _ -> invalidOperation qNaN
+
+{- $doctest-invert
+>>> op1 Op.invert "0"
+111111111
+
+>>> op1 Op.invert "1"
+111111110
+
+>>> op1 Op.invert "111111111"
+0
+
+>>> op1 Op.invert "101010101"
+10101010
+-}
 
 -- | 'canonical' takes one operand. The result has the same value as the
 -- operand but always uses a /canonical/ encoding. The definition of
