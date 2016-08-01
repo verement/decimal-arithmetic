@@ -1,7 +1,6 @@
 
-{- | Eventually most or all of the arithmetic operations described in the
-/General Decimal Arithmetic Specification/ will be provided here. For now, the
-operations are mostly limited to those exposed through various class methods.
+{- | The operations described in the /General Decimal Arithmetic Specification/
+are provided here.
 
 It is suggested to import this module qualified to avoid "Prelude" name
 clashes:
@@ -10,7 +9,8 @@ clashes:
 
 Note that it is not usually necessary to import this module unless you want to
 use operations unavailable through class methods, or you need precise control
-over the handling of exceptional conditions.
+over the handling of exceptional conditions. (See also
+"Numeric.Decimal.Arithmetic".)
 -}
 module Numeric.Decimal.Operation
        ( -- * Arithmetic operations
@@ -321,7 +321,7 @@ multiply x y = return (toQNaN2 x y)
 -- Otherwise, the result is /e/ raised to the power of the operand, with the
 -- following cases:
 --
--- * If the operand is -Infinity, the result is 0 and exact.
+-- * If the operand is −Infinity, the result is 0 and exact.
 --
 -- * If the operand is a zero, the result is 1 and exact.
 --
@@ -442,7 +442,7 @@ fusedMultiplyAdd x y z =
 -- Otherwise, the operand must be a zero or positive, and the result is the
 -- natural (base /e/) logarithm of the operand, with the following cases:
 --
--- * If the operand is a zero, the result is -Infinity and exact.
+-- * If the operand is a zero, the result is −Infinity and exact.
 --
 -- * If the operand is +Infinity, the result is +Infinity and exact.
 --
@@ -538,7 +538,7 @@ Infinity
 -- Otherwise, the operand must be a zero or positive, and the result is the
 -- base 10 logarithm of the operand, with the following cases:
 --
--- * If the operand is a zero, the result is -Infinity and exact.
+-- * If the operand is a zero, the result is −Infinity and exact.
 --
 -- * If the operand is +Infinity, the result is +Infinity and exact.
 --
@@ -735,7 +735,7 @@ abs x
 -- either operand is a /special value/ then the general rules apply. No flags
 -- are set unless an operand is a signaling NaN.
 --
--- Otherwise, the operands are compared, returning @-1@ if the first is less
+-- Otherwise, the operands are compared, returning @−1@ if the first is less
 -- than the second, @0@ if they are equal, or @1@ if the first is greater than
 -- the second.
 compare :: (Precision p, Rounding r)
@@ -1117,18 +1117,18 @@ reduce n = reduce' <$> plus n
 -- the general rules apply.
 --
 -- Otherwise, the ideal exponent of the result is defined to be half the
--- exponent of the operand (rounded to an integer, towards -Infinity, if
+-- exponent of the operand (rounded to an integer, towards −Infinity, if
 -- necessary) and then:
 --
 -- If the operand is less than zero an Invalid operation condition is raised.
 --
 -- If the operand is greater than zero, the result is the square root of the
 -- operand. If no rounding is necessary (the exact result requires /precision/
--- digits or fewer) then the the coefficient and exponent giving the correct
--- value and with the exponent closest to the ideal exponent is used. If the
--- result must be inexact, it is rounded using the /round-half-even/ algorithm
--- and the coefficient will have exactly /precision/ digits (unless the result
--- is subnormal), and the exponent will be set to maintain the correct value.
+-- digits or fewer) then the coefficient and exponent giving the correct value
+-- and with the exponent closest to the ideal exponent is used. If the result
+-- must be inexact, it is rounded using the /round-half-even/ algorithm and
+-- the coefficient will have exactly /precision/ digits (unless the result is
+-- subnormal), and the exponent will be set to maintain the correct value.
 --
 -- Otherwise (the operand is equal to zero), the result will be the zero with
 -- the same sign as the operand and with the ideal exponent.
@@ -1402,7 +1402,7 @@ invert x = case toLogical x of
 --
 -- If all possible operands have just one internal encoding each, then
 -- 'canonical' always returns the operand unchanged (that is, it has the same
--- effect as 'copy'). This operation is unaffected by context and is quiet –
+-- effect as 'copy'). This operation is unaffected by context and is quiet —
 -- no /flags/ are changed in the context.
 canonical :: Decimal a b -> Arith p r (Decimal a b)
 canonical = return
@@ -1509,7 +1509,7 @@ sNaN
 -}
 
 -- | 'copy' takes one operand. The result is a copy of the operand. This
--- operation is unaffected by context and is quiet – no /flags/ are changed in
+-- operation is unaffected by context and is quiet — no /flags/ are changed in
 -- the context.
 copy :: Decimal a b -> Arith p r (Decimal a b)
 copy = return
@@ -1524,7 +1524,7 @@ copy = return
 
 -- | 'copyAbs' takes one operand. The result is a copy of the operand with the
 -- /sign/ set to 0. Unlike the 'abs' operation, this operation is unaffected
--- by context and is quiet – no /flags/ are changed in the context.
+-- by context and is quiet — no /flags/ are changed in the context.
 copyAbs :: Decimal a b -> Arith p r (Decimal a b)
 copyAbs n = return n { sign = Pos }
 
@@ -1538,7 +1538,7 @@ copyAbs n = return n { sign = Pos }
 
 -- | 'copyNegate' takes one operand. The result is a copy of the operand with
 -- the /sign/ inverted (a /sign/ of 0 becomes 1 and vice versa). Unlike the
--- 'minus' operation, this operation is unaffected by context and is quiet –
+-- 'minus' operation, this operation is unaffected by context and is quiet —
 -- no /flags/ are changed in the context.
 copyNegate :: Decimal a b -> Arith p r (Decimal a b)
 copyNegate n = return n { sign = negateSign (sign n) }
@@ -1553,7 +1553,7 @@ copyNegate n = return n { sign = negateSign (sign n) }
 
 -- | 'copySign' takes two operands. The result is a copy of the first operand
 -- with the /sign/ set to be the same as the /sign/ of the second
--- operand. This operation is unaffected by context and is quiet – no /flags/
+-- operand. This operation is unaffected by context and is quiet — no /flags/
 -- are changed in the context.
 copySign :: Decimal a b -> Decimal c d -> Arith p r (Decimal a b)
 copySign n m = return n { sign = sign m }
@@ -1581,7 +1581,7 @@ copySign n m = return n { sign = sign m }
 --
 -- If all possible operands have just one internal encoding each, then
 -- 'isCanonical' always returns 1. This operation is unaffected by context and
--- is quiet – no /flags/ are changed in the context.
+-- is quiet — no /flags/ are changed in the context.
 isCanonical :: Decimal a b -> Arith p r Bool
 isCanonical _ = return True
 
@@ -1593,7 +1593,7 @@ isCanonical _ = return True
 -- | 'isFinite' takes one operand. The result is 1 if the operand is neither
 -- infinite nor a NaN (that is, it is a normal number, a subnormal number, or
 -- a zero); otherwise it is 0. This operation is unaffected by context and is
--- quiet – no /flags/ are changed in the context.
+-- quiet — no /flags/ are changed in the context.
 isFinite :: Decimal a b -> Arith p r Bool
 isFinite = return . Number.isFinite
 
@@ -1616,7 +1616,7 @@ isFinite = return . Number.isFinite
 
 -- | 'isInfinite' takes one operand. The result is 1 if the operand is an
 -- Infinity; otherwise it is 0. This operation is unaffected by context and is
--- quiet – no /flags/ are changed in the context.
+-- quiet — no /flags/ are changed in the context.
 isInfinite :: Decimal a b -> Arith p r Bool
 isInfinite n = return $ case n of
   Inf{} -> True
@@ -1635,7 +1635,7 @@ isInfinite n = return $ case n of
 
 -- | 'isNaN' takes one operand. The result is 1 if the operand is a NaN (quiet
 -- or signaling); otherwise it is 0. This operation is unaffected by context
--- and is quiet – no /flags/ are changed in the context.
+-- and is quiet — no /flags/ are changed in the context.
 isNaN :: Decimal a b -> Arith p r Bool
 isNaN n = return $ case n of
   QNaN{} -> True
@@ -1678,7 +1678,7 @@ isNormal = return . Number.isNormal
 
 -- | 'isQNaN' takes one operand. The result is 1 if the operand is a quiet
 -- NaN; otherwise it is 0. This operation is unaffected by context and is
--- quiet – no /flags/ are changed in the context.
+-- quiet — no /flags/ are changed in the context.
 isQNaN :: Decimal a b -> Arith p r Bool
 isQNaN n = return $ case n of
   QNaN{} -> True
@@ -1697,7 +1697,7 @@ isQNaN n = return $ case n of
 
 -- | 'isSigned' takes one operand. The result is 1 if the /sign/ of the
 -- operand is 1; otherwise it is 0. This operation is unaffected by context
--- and is quiet – no /flags/ are changed in the context.
+-- and is quiet — no /flags/ are changed in the context.
 isSigned :: Decimal a b -> Arith p r Bool
 isSigned = return . Number.isNegative
 
@@ -1714,7 +1714,7 @@ isSigned = return . Number.isNegative
 
 -- | 'isSNaN' takes one operand. The result is 1 if the operand is a signaling
 -- NaN; otherwise it is 0. This operation is unaffected by context and is
--- quiet – no /flags/ are changed in the context.
+-- quiet — no /flags/ are changed in the context.
 isSNaN :: Decimal a b -> Arith p r Bool
 isSNaN n = return $ case n of
   SNaN{} -> True
@@ -1755,7 +1755,7 @@ isSubnormal = return . Number.isSubnormal
 -}
 
 -- | 'isZero' takes one operand. The result is 1 if the operand is a zero;
--- otherwise it is 0. This operation is unaffected by context and is quiet –
+-- otherwise it is 0. This operation is unaffected by context and is quiet —
 -- no /flags/ are changed in the context.
 isZero :: Decimal a b -> Arith p r Bool
 isZero = return . Number.isZero
@@ -1773,7 +1773,7 @@ isZero = return . Number.isZero
 
 -- | 'logb' takes one operand. If the operand is a NaN then the general
 -- arithmetic rules apply. If the operand is infinite then +Infinity is
--- returned. If the operand is a zero, then -Infinity is returned and the
+-- returned. If the operand is a zero, then −Infinity is returned and the
 -- Division by zero exceptional condition is raised.
 --
 -- Otherwise, the result is the integer which is the exponent of the magnitude
@@ -1858,7 +1858,7 @@ sameQuantum _      _      = return False
 -}
 
 -- | 'shift' takes two operands. The second operand must be an integer (with
--- an /exponent/ of 0) in the range /-precision/ through /precision/. If the
+-- an /exponent/ of 0) in the range /−precision/ through /precision/. If the
 -- first operand is a NaN then the general arithmetic rules apply, and if it
 -- is infinite then the result is the Infinity unchanged.
 --

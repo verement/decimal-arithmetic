@@ -138,11 +138,16 @@ instance Monad (Arith p r) where
   Arith e >>= f = Arith (e >>= g)
     where g x = let Arith t = f x in t
 
+-- | Traps (vis-à-vis 'TrapHandler') may call 'throwError' to abort the
+-- arithmetic computation (or be caught using 'catchError').
 instance MonadError (Exception p r) (Arith p r) where
   throwError = Arith . throwError
   catchError (Arith e) f = Arith (catchError e g)
     where g x = let Arith t = f x in t
 
+-- | The 'Context' of an arithmetic computation may be manipulated using 'get'
+-- and 'put', et al. For example, the current signal flags can be observed
+-- with @'gets' 'flags'@.
 instance MonadState (Context p r) (Arith p r) where
   get = Arith   get
   put = Arith . put

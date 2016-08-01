@@ -122,5 +122,6 @@ replacing 'Double' and/or 'Integer'. For example:
 
 Additional operations and control beyond what is provided by the basic numeric
 type classes are available through the use of "Numeric.Decimal.Arithmetic" and
-"Numeric.Decimal.Operation".
+"Numeric.Decimal.Operation". Advanced string conversion is also available
+through "Numeric.Decimal.Conversion".
 -}

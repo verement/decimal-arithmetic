@@ -101,9 +101,14 @@ data Decimal p r
          , payload     :: Payload
          }
 
+-- | The 'Show' instance uses the 'toScientificString' operation from
+-- "Numeric.Decimal.Conversion".
 instance Show (Decimal p r) where
   showsPrec d n = showParen (d > 0 && isNegative n) $ toScientificString n
 
+-- | The 'Read' instance uses the 'toNumber' operation from
+-- "Numeric.Decimal.Conversion" and rounds the result to the required
+-- precision.
 instance (Precision p, Rounding r) => Read (Decimal p r) where
   readsPrec _ str = [ (cast n, s)
                     | (n, s) <- readParen False
@@ -170,6 +175,10 @@ prop> min x y == x ==> x <= y
 prop> min x y == y ==> y <= x
 -}
 
+-- | Unlike the instances for 'Float' and 'Double', the lists returned by the
+-- 'enumFromTo' and 'enumFromThenTo' methods in this instance terminate with
+-- the last element strictly less than (greater than in the case of a negative
+-- increment) or equal to the given bound.
 instance (Precision p, Rounding r) => Enum (Decimal p r) where
   succ x = evalOp (x `Op.add`      one)
   pred x = evalOp (x `Op.subtract` one)
@@ -306,6 +315,8 @@ castDown = cast
 notyet :: String -> a
 notyet = error . (++ ": not yet implemented")
 
+-- | The trigonometric and hyperbolic 'Floating' methods (other than the
+-- precision-dependent constant 'pi') are not yet implemented.
 instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   pi = castDown seriesPi
 
