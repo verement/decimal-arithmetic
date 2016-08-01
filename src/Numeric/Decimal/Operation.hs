@@ -72,7 +72,7 @@ module Numeric.Decimal.Operation
        , logb
        , or
        , radix
-         -- rotate
+       , rotate
        , sameQuantum
          -- scaleb
        , shift
@@ -1874,20 +1874,22 @@ sameQuantum _      _      = return False
 --
 -- The 'rotate' operation can be used to rotate rather than shift a
 -- coefficient.
-shift :: Precision p => Decimal p a -> Decimal b c -> Arith p r (Decimal p a)
+shift :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 shift n@Num { coefficient = c } s@Num { sign = d, coefficient = sc }
-  | validShift n s = return $ case d of
-      Pos -> case precision n of
-        Just p  -> n { coefficient = (c  *     10 ^ sc) `rem` 10 ^ p }
-        Nothing -> n { coefficient =  c  *     10 ^ sc }
-      Neg ->       n { coefficient =  c `quot` 10 ^ sc }
-shift n@Inf{}  s | validShift n s = return n
-shift n@QNaN{} s | validShift n s = return n
-shift n        _                  = coerce <$> invalidOperation n
+  | validShift z s = return z
+  where z = case precision z of
+          Just p  -> y { coefficient = coefficient y `rem` 10 ^ p }
+          Nothing -> y
+        y = case d of
+          Pos -> n { coefficient =  c  *     10 ^ sc }
+          Neg -> n { coefficient =  c `quot` 10 ^ sc }
+shift n@Inf{}  s | validShift z s = return z where z = coerce n
+shift n@QNaN{} s | validShift z s = return z where z = coerce n
+shift n        _                  = invalidOperation n
 
-validShift :: Precision p => Decimal p a -> Decimal b c -> Bool
-validShift n Num { coefficient = c, exponent = 0 } =
-  let p = fromIntegral <$> precision n in maybe True (c <=) p
+validShift :: Precision p => p -> Decimal a b -> Bool
+validShift px Num { coefficient = c, exponent = 0 } =
+  let p = fromIntegral <$> precision px in maybe True (c <=) p
 validShift _ _ = False
 
 {- $doctest-shift
@@ -1905,4 +1907,59 @@ validShift _ _ = False
 
 >>> op2 Op.shift "123456789" "+2"
 345678900
+-}
+
+-- | 'rotate' takes two operands. The second operand must be an integer (with
+-- an /exponent/ of 0) in the range /−precision/ through /precision/. If the
+-- first operand is a NaN then the general arithmetic rules apply, and if it
+-- is infinite then the result is the Infinity unchanged.
+--
+-- Otherwise (the first operand is finite) the result has the same /sign/ and
+-- /exponent/ as the first operand, and a /coefficient/ which is a rotated
+-- copy of the digits in the coefficient of the first operand. The number of
+-- places of rotation is taken from the absolute value of the second operand,
+-- with the rotation being to the left if the second operand is positive or to
+-- the right otherwise.
+--
+-- If the coefficient of the first operand has fewer than /precision/ digits,
+-- it is treated as though it were padded on the left with zeros to length
+-- /precision/ before the rotation. Similarly, if the coefficient of the first
+-- operand has more than /precision/ digits, it is truncated on the left
+-- before use.
+--
+-- The only /flag/ that might be set is /invalid-operation/ (set if the first
+-- operand is an sNaN or the second is not valid).
+--
+-- The 'shift' operation can be used to shift rather than rotate a
+-- coefficient.
+rotate :: FinitePrecision p
+       => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+rotate n@Num { coefficient = c } s@Num { sign = d, coefficient = sc }
+  | validShift z s = return z
+  where z = n { coefficient = rc * b + (lc `rem` b) }
+        (lc, rc) = c `quotRem` b'
+        (b , b') = case d of
+          Pos -> (10^sc , 10^sc')
+          Neg -> (10^sc', 10^sc )
+        Just p = precision z
+        sc'    = p - fromIntegral sc
+rotate n@Inf{}  s | validShift z s = return z where z = coerce n
+rotate n@QNaN{} s | validShift z s = return z where z = coerce n
+rotate n        _                  = invalidOperation n
+
+{- $doctest-rotate
+>>> op2 Op.rotate "34" "8"
+400000003
+
+>>> op2 Op.rotate "12" "9"
+12
+
+>>> op2 Op.rotate "123456789" "-2"
+891234567
+
+>>> op2 Op.rotate "123456789" "0"
+123456789
+
+>>> op2 Op.rotate "123456789" "+2"
+345678912
 -}
