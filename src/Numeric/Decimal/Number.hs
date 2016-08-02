@@ -23,7 +23,9 @@ module Numeric.Decimal.Number
 
        , flipSign
        , cast
+
        , fromBool
+       , fromOrdering
 
        , isPositive
        , isNegative
@@ -574,6 +576,14 @@ toBool Num { coefficient = c }
   | otherwise = True
 toBool Inf{}  = True
 toBool _      = False
+
+-- | Return @-1@, @0@, or @1@ if the argument is 'LT', 'EQ', or 'GT',
+-- respectively. This allows an all-decimal usage of the operations from
+-- "Numeric.Decimal.Operation" that return an 'Ordering'.
+fromOrdering :: Ordering -> Decimal p r
+fromOrdering LT = negativeOne
+fromOrdering EQ = zero
+fromOrdering GT = one
 
 -- | Upper limit on the absolute value of the exponent
 eLimit :: Precision p => p -> Maybe Exponent

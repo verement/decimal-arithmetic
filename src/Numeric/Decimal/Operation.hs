@@ -1236,6 +1236,9 @@ specification; confirmed with Mike Cowlishaw on 2016-08-02.
 -- /General Decimal Arithmetic Specification/, these operations return a
 -- 'Bool' in this implementation, but can be converted to 'Decimal' via
 -- 'fromBool'.
+--
+-- Similarly, the total ordering operations return an 'Ordering' value in this
+-- implementation, but can be converted to 'Decimal' via 'fromOrdering'.
 
 data Logical = Logical { bits :: Integer, bitLength :: Int }
 
@@ -1512,10 +1515,10 @@ sNaN
 -- representation rather than their numerical value. A /total ordering/ is
 -- defined for all possible abstract representations, as described below. If
 -- the first operand is lower in the total order than the second operand then
--- the result is @-1@, if the operands have the same abstract representation
--- then the result is @0@, and if the first operand is higher in the total
--- order than the second operand then the result is @1@. The total ordering is
--- defined as follows.
+-- the result is 'LT', if the operands have the same abstract representation
+-- then the result is 'EQ', and if the first operand is higher in the total
+-- order than the second operand then the result is 'GT'. The total ordering
+-- is defined as follows.
 --
 -- 1. The following items describe the ordering for representations whose
 -- /sign/ is 0. If the /sign/ is 1, the order is reversed. A representation
@@ -1535,20 +1538,14 @@ sNaN
 -- For example, the following values are ordered from lowest to highest: @-NaN
 -- -sNaN -Infinity -127 -1 -1.00 -0 -0.000 0 1.2300 1.23 1E+9 Infinity sNaN
 -- NaN NaN456@.
-compareTotal :: Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-compareTotal x y = return $ case compareTotal' x y of
-  LT -> negativeOne
-  EQ -> zero
-  GT -> one
+compareTotal :: Decimal a b -> Decimal c d -> Arith p r Ordering
+compareTotal x y = return $ case (sign x, sign y) of
+  (Pos, Pos) -> compareAbs x y
+  (Neg, Neg) -> compareAbs y x
+  (Neg, Pos) -> LT
+  (Pos, Neg) -> GT
 
-  where compareTotal' :: Decimal a b -> Decimal c d -> Ordering
-        compareTotal' x y = case (sign x, sign y) of
-          (Pos, Pos) -> compareAbs x y
-          (Neg, Neg) -> compareAbs y x
-          (Neg, Pos) -> LT
-          (Pos, Neg) -> GT
-
-        compareAbs :: Decimal a b -> Decimal c d -> Ordering
+  where compareAbs :: Decimal a b -> Decimal c d -> Ordering
         compareAbs Num { coefficient = xc, exponent = xe }
                    Num { coefficient = yc, exponent = ye } =
           let (xac, yac) | xe == ye  = (xc, yc)
@@ -1567,22 +1564,22 @@ compareTotal x y = return $ case compareTotal' x y of
         compareAbs   _        SNaN{} = LT
 
 {- $doctest-compareTotal
->>> op2 Op.compareTotal "12.73" "127.9"
+>>> fromOrdering $ op2 Op.compareTotal "12.73" "127.9"
 -1
 
->>> op2 Op.compareTotal "-127" "12"
+>>> fromOrdering $ op2 Op.compareTotal "-127" "12"
 -1
 
->>> op2 Op.compareTotal "12.30" "12.3"
+>>> fromOrdering $ op2 Op.compareTotal "12.30" "12.3"
 -1
 
->>> op2 Op.compareTotal "12.30" "12.30"
+>>> fromOrdering $ op2 Op.compareTotal "12.30" "12.30"
 0
 
->>> op2 Op.compareTotal "12.3" "12.300"
+>>> fromOrdering $ op2 Op.compareTotal "12.3" "12.300"
 1
 
->>> op2 Op.compareTotal "12.3" "NaN"
+>>> fromOrdering $ op2 Op.compareTotal "12.3" "NaN"
 -1
 -}
 
@@ -1591,7 +1588,7 @@ compareTotal x y = return $ case compareTotal' x y of
 -- /sign/ ignored and assumed to be 0. The result is identical to that
 -- obtained by using 'compareTotal' on two operands which are the 'copyAbs'
 -- copies of the operands to 'compareTotalMagnitude'.
-compareTotalMagnitude :: Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+compareTotalMagnitude :: Decimal a b -> Decimal c d -> Arith p r Ordering
 compareTotalMagnitude x y = compareTotal x { sign = Pos } y { sign = Pos }
 
 -- | 'copy' takes one operand. The result is a copy of the operand. This
