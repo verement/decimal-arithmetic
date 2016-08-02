@@ -120,8 +120,8 @@ replacing 'Double' and/or 'Integer'. For example:
 
 == Advanced usage
 
-Additional operations and control beyond what is provided by the basic numeric
-type classes are available through the use of "Numeric.Decimal.Arithmetic" and
+Additional operations and control beyond what is provided by the standard type
+classes are available through the use of "Numeric.Decimal.Arithmetic" and
 "Numeric.Decimal.Operation". Advanced string conversion is also available
 through "Numeric.Decimal.Conversion".
 -}

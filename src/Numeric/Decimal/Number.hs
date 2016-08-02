@@ -559,10 +559,10 @@ isSubnormal n
   | isFinite n && not (isZero n) = maybe False (adjustedExponent n <) (eMin n)
   | otherwise                    = False
 
--- | If the argument is 'False', return a 'Decimal' value zero; if 'True',
--- return the value one. This is basically an optimized @toEnum . fromEnum@ to
--- support an all-decimal usage of the operations from
--- "Numeric.Decimal.Operation" that return a 'Bool'.
+-- | Return @0@ or @1@ if the argument is 'False' or 'True', respectively.
+-- This is basically an optimized @'toEnum' . 'fromEnum'@ and allows an
+-- all-decimal usage of the operations from "Numeric.Decimal.Operation" that
+-- return a 'Bool'.
 fromBool :: Bool -> Decimal p r
 fromBool False = zero
 fromBool True  = one
