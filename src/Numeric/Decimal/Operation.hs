@@ -1192,10 +1192,10 @@ squareRoot n                    = coerce <$> invalidOperation n
 >>> op1 Op.squareRoot "-0"
 -0
 
-This example appears to contradict the specification that the resulting
-coefficient will have exactly /precision/ digits; awaiting clarification.
-<<< op1 Op.squareRoot "0.39"
-0.62449980
+The following example is a corrected version of that found in the
+specification; confirmed with Mike Cowlishaw on 2016-08-02.
+>>> op1 Op.squareRoot "0.39"
+0.624499800
 
 >>> op1 Op.squareRoot "100"
 10
