@@ -52,8 +52,8 @@ module Numeric.Decimal.Operation
        , and
        , canonical
        , class_, Class(..), Sign(..), NumberClass(..), NaNClass(..)
-         -- compareTotal
-         -- compareTotalMagnitude
+       , compareTotal
+       , compareTotalMagnitude
        , copy
        , copyAbs
        , copyNegate
@@ -1507,6 +1507,92 @@ NaN
 >>> op1 Op.class_ "sNaN"
 sNaN
 -}
+
+-- | 'compareTotal' takes two operands and compares them using their abstract
+-- representation rather than their numerical value. A /total ordering/ is
+-- defined for all possible abstract representations, as described below. If
+-- the first operand is lower in the total order than the second operand then
+-- the result is @-1@, if the operands have the same abstract representation
+-- then the result is @0@, and if the first operand is higher in the total
+-- order than the second operand then the result is @1@. The total ordering is
+-- defined as follows.
+--
+-- 1. The following items describe the ordering for representations whose
+-- /sign/ is 0. If the /sign/ is 1, the order is reversed. A representation
+-- with a /sign/ of 1 is always lower in the ordering than one with a /sign/
+-- of 0.
+--
+-- 2. Numbers (representations which are not NaNs) are ordered such that a
+-- larger numerical value is higher in the ordering. If two representations
+-- have the same numerical value then the exponent is taken into account;
+-- larger (more positive) exponents are higher in the ordering.
+--
+-- 3. All quiet NaNs are higher in the total ordering than all signaling NaNs.
+--
+-- 4. Quiet NaNs and signaling NaNs are ordered according to their /payload/;
+-- a larger payload is higher in the ordering.
+--
+-- For example, the following values are ordered from lowest to highest: @-NaN
+-- -sNaN -Infinity -127 -1 -1.00 -0 -0.000 0 1.2300 1.23 1E+9 Infinity sNaN
+-- NaN NaN456@.
+compareTotal :: Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+compareTotal x y = return $ case compareTotal' x y of
+  LT -> negativeOne
+  EQ -> zero
+  GT -> one
+
+  where compareTotal' :: Decimal a b -> Decimal c d -> Ordering
+        compareTotal' x y = case (sign x, sign y) of
+          (Pos, Pos) -> compareAbs x y
+          (Neg, Neg) -> compareAbs y x
+          (Neg, Pos) -> LT
+          (Pos, Neg) -> GT
+
+        compareAbs :: Decimal a b -> Decimal c d -> Ordering
+        compareAbs Num { coefficient = xc, exponent = xe }
+                   Num { coefficient = yc, exponent = ye } =
+          let (xac, yac) | xe == ye  = (xc, yc)
+                         | xe >  ye  = (xc * 10^n, yc)
+                         | otherwise = (xc, yc * 10^n)
+              n = Prelude.abs (xe - ye)
+          in Prelude.compare xac yac `mappend` Prelude.compare xe ye
+        compareAbs   Num{}    Inf{}  = LT
+        compareAbs   Inf{}    Num{}  = GT
+        compareAbs   Inf{}    Inf{}  = EQ
+        compareAbs x@QNaN{} y@QNaN{} = Prelude.compare (payload x) (payload y)
+        compareAbs   QNaN{}   _      = GT
+        compareAbs   _        QNaN{} = LT
+        compareAbs x@SNaN{} y@SNaN{} = Prelude.compare (payload x) (payload y)
+        compareAbs   SNaN{}   _      = GT
+        compareAbs   _        SNaN{} = LT
+
+{- $doctest-compareTotal
+>>> op2 Op.compareTotal "12.73" "127.9"
+-1
+
+>>> op2 Op.compareTotal "-127" "12"
+-1
+
+>>> op2 Op.compareTotal "12.30" "12.3"
+-1
+
+>>> op2 Op.compareTotal "12.30" "12.30"
+0
+
+>>> op2 Op.compareTotal "12.3" "12.300"
+1
+
+>>> op2 Op.compareTotal "12.3" "NaN"
+-1
+-}
+
+-- | 'compareTotalMagnitude' takes two operands and compares them using their
+-- abstract representation rather than their numerical value and with their
+-- /sign/ ignored and assumed to be 0. The result is identical to that
+-- obtained by using 'compareTotal' on two operands which are the 'copyAbs'
+-- copies of the operands to 'compareTotalMagnitude'.
+compareTotalMagnitude :: Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+compareTotalMagnitude x y = compareTotal x { sign = Pos } y { sign = Pos }
 
 -- | 'copy' takes one operand. The result is a copy of the operand. This
 -- operation is unaffected by context and is quiet — no /flags/ are changed in
