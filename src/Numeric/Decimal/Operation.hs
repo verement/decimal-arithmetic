@@ -115,23 +115,20 @@ result = roundDecimal  -- ...
 --  | maybe False (numDigits c >) (precision r) = undefined
 
 invalidOperation :: Decimal a b -> Arith p r (Decimal p r)
-invalidOperation n = raiseSignal InvalidOperation qNaN
+invalidOperation n = raiseSignal InvalidOperation $ case n of
+  SNaN { sign = s, payload = p } -> qNaN { sign = s, payload = p }
+  _                              -> qNaN
 
-toQNaN :: Decimal a b -> Decimal p r
-toQNaN SNaN { sign = s, payload = p } = QNaN { sign = s, payload = p }
-toQNaN n@QNaN{}                       = coerce n
-toQNaN n                              = qNaN { sign = sign n }
+generalRules1 :: Decimal a b -> Arith p r (Decimal p r)
+generalRules1 nan@QNaN{} = return (coerce nan)
+generalRules1 x          = invalidOperation x
 
-toQNaN2 :: Decimal a b -> Decimal c d -> Decimal p r
-toQNaN2 nan@SNaN{} _ = toQNaN nan
-toQNaN2 _ nan@SNaN{} = toQNaN nan
-toQNaN2 nan@QNaN{} _ = coerce nan
-toQNaN2 _ nan@QNaN{} = coerce nan
-toQNaN2 n _          = toQNaN n
-
-quietToSignal :: Decimal p r -> Decimal p r
-quietToSignal QNaN { sign = s, payload = p } = SNaN { sign = s, payload = p }
-quietToSignal x = x
+generalRules2 :: Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+generalRules2 nan@SNaN{} _          = invalidOperation nan
+generalRules2 _          nan@SNaN{} = invalidOperation nan
+generalRules2 nan@QNaN{} _          = return (coerce nan)
+generalRules2 _          nan@QNaN{} = return (coerce nan)
+generalRules2 x          _          = invalidOperation x
 
 -- $arithmetic-operations
 --
@@ -200,10 +197,10 @@ add Num { sign = xs, coefficient = xc, exponent = xe }
 
 add inf@Inf { sign = xs } Inf { sign = ys }
   | xs == ys  = return (coerce inf)
-  | otherwise = invalidOperation inf
+  | otherwise = invalidOperation qNaN
 add inf@Inf{} Num{} = return (coerce inf)
 add Num{} inf@Inf{} = return (coerce inf)
-add x y             = return (toQNaN2 x y)
+add x y = generalRules2 x y
 
 {- $doctest-add
 >>> op2 Op.add "12" "7.00"
@@ -294,9 +291,7 @@ multiply Inf { sign = xs } Num { sign = ys, coefficient = yc }
 multiply Num { sign = xs, coefficient = xc } Inf { sign = ys }
   | xc == 0   = invalidOperation qNaN
   | otherwise = return Inf { sign = xorSigns xs ys }
-multiply nan@SNaN{} _ = invalidOperation nan
-multiply _ nan@SNaN{} = invalidOperation nan
-multiply x y = return (toQNaN2 x y)
+multiply x y = generalRules2 x y
 
 {- $doctest-multiply
 >>> op2 Op.multiply "1.20" "3"
@@ -378,8 +373,7 @@ exp x@Num { sign = s, coefficient = c }
 exp n@Inf { sign = s }
   | s == Pos  = return (coerce n)
   | otherwise = return zero
-exp n@QNaN{}  = return (coerce n)
-exp n@SNaN{}  = coerce <$> invalidOperation n
+exp x = coerce <$> generalRules1 x
 
 {- $doctest-exp
 >>> op1 Op.exp "-Infinity"
@@ -475,8 +469,7 @@ ln x@Num { sign = s, coefficient = c, exponent = e }
           where r' = coerce r
 
 ln n@Inf { sign = Pos } = return (coerce n)
-ln n@QNaN{} = return (coerce n)
-ln n = coerce <$> invalidOperation n
+ln x = coerce <$> generalRules1 x
 
 taylorLn :: FinitePrecision p => Decimal a b
          -> Arith p RoundHalfEven (Decimal p RoundHalfEven)
@@ -570,8 +563,7 @@ log10 x@Num { sign = s, coefficient = c, exponent = e }
           where r' = coerce r
 
 log10 n@Inf { sign = Pos } = return (coerce n)
-log10 n@QNaN{} = return (coerce n)
-log10 n = coerce <$> invalidOperation n
+log10 x = coerce <$> generalRules1 x
 
 {- $doctest-log10
 >>> op1 Op.log10 "0"
@@ -635,7 +627,7 @@ divide Inf { sign = xs } Num { sign = ys } =
   return Inf { sign = xorSigns xs ys }
 divide Num { sign = xs } Inf { sign = ys } =
   return zero { sign = xorSigns xs ys }
-divide x y = return (toQNaN2 x y)
+divide x y = generalRules2 x y
 
 {- $doctest-divide
 >>> op2 Op.divide "1" "3"
@@ -762,7 +754,7 @@ compare x@Num{} y@Num{} = nzp <$> subArith (subtract' xn yn)
         nzp Inf { sign = s } = case s of
           Pos -> Right GT
           Neg -> Right LT
-        nzp n = Left (toQNaN n)
+        nzp n = Left (coerce n)
 
 compare Inf { sign = xs } Inf { sign = ys } = return $ case (xs, ys) of
   (Pos, Neg) -> Right GT
@@ -774,9 +766,7 @@ compare Inf { sign = xs } Num { } = return $ case xs of
 compare Num { } Inf { sign = ys } = return $ case ys of
   Pos -> Right LT
   Neg -> Right GT
-compare nan@SNaN{} _ = Left <$> invalidOperation nan
-compare _ nan@SNaN{} = Left <$> invalidOperation nan
-compare x y          = return (Left $ toQNaN2 x y)
+compare x y = Left <$> generalRules2 x y
 
 {- $doctest-compare
 >>> either id fromOrdering $ op2 Op.compare "2.1" "3"
@@ -808,6 +798,11 @@ compareSignal :: Decimal a b -> Decimal c d
 compareSignal x@SNaN{} y        =               x `compare`               y
 compareSignal x        y@SNaN{} =               x `compare`               y
 compareSignal x        y        = quietToSignal x `compare` quietToSignal y
+
+  where quietToSignal :: Decimal p r -> Decimal p r
+        quietToSignal QNaN { sign = s, payload = p } =
+                      SNaN { sign = s, payload = p }
+        quietToSignal x = x
 
 -- | 'max' takes two operands, compares their values numerically, and returns
 -- the maximum. If either operand is a NaN then the general rules apply,
@@ -957,10 +952,7 @@ power x@Inf{} y@Num{}
 power Inf{} Inf { sign = s }
   | s == Pos            = return infinity
   | otherwise           = return zero
-power x@SNaN{} _        = invalidOperation x
-power _        y@SNaN{} = invalidOperation y
-power x@QNaN{} _        = return (coerce x)
-power _        y@QNaN{} = return (coerce y)
+power x y = generalRules2 x y
 
 powerSign :: Decimal a b -> Decimal c d -> Sign
 powerSign x y
@@ -1054,7 +1046,7 @@ quantize x@Num { coefficient = xc, exponent = xe } Num { exponent = ye }
 
   where result :: Precision p => Decimal p r -> Arith p r (Decimal p r)
         result x = getPrecision >>= \p -> case numDigits (coefficient x) of
-          n | maybe False (n >) p -> invalidOperation x
+          n | maybe False (n >) p -> invalidOperation qNaN
           _                       -> return x
 
         rc :: Rounding r => Arith p r Coefficient
@@ -1065,10 +1057,7 @@ quantize x@Num { coefficient = xc, exponent = xe } Num { exponent = ye }
 quantize Num{}      Inf{}    = invalidOperation qNaN
 quantize Inf{}      Num{}    = invalidOperation qNaN
 quantize n@Inf{}    Inf{}    = return n
-quantize n@SNaN{}   _        = invalidOperation n
-quantize _          n@SNaN{} = invalidOperation n
-quantize n@QNaN{}   _        = return         n
-quantize _          n@QNaN{} = return (coerce n)
+quantize x y = generalRules2 x y
 
 {- $doctest-quantize
 >>> op2 Op.quantize "2.17" "0.001"
@@ -1220,8 +1209,7 @@ squareRoot n@Num { sign = s, coefficient = c, exponent = e }
           if x' == x then return x' else babylonian x'
 
 squareRoot n@Inf { sign = Pos } = return (coerce n)
-squareRoot n@QNaN{}             = return (coerce n)
-squareRoot n                    = coerce <$> invalidOperation n
+squareRoot x = coerce <$> generalRules1 x
 
 {- $doctest-squareRoot
 >>> op1 Op.squareRoot "0"
@@ -1311,13 +1299,14 @@ fromLogical Logical { bits = b, bitLength = l } =
 -- least-significant digit. A result digit is 1 if both of the corresponding
 -- operand digits are 1; otherwise it is 0.
 and :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-and x y = case (toLogical x, toLogical y) of
+and x@Num{} y@Num{} = case (toLogical x, toLogical y) of
   (Just lx, Just ly) -> getPrecision >>= \p ->
     let m = Prelude.min (bitLength lx) (bitLength ly)
         z = Logical { bits = bits lx .&. bits ly
                     , bitLength = maybe m (Prelude.min m) p }
     in return (fromLogical z)
   _ -> invalidOperation qNaN
+and x y = generalRules2 x y
 
 {- $doctest-and
 >>> op2 Op.and "0" "0"
@@ -1345,13 +1334,14 @@ and x y = case (toLogical x, toLogical y) of
 -- aligned at the least-significant digit. A result digit is 1 if either or
 -- both of the corresponding operand digits is 1; otherwise it is 0.
 or :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-or x y = case (toLogical x, toLogical y) of
+or x@Num{} y@Num{} = case (toLogical x, toLogical y) of
   (Just lx, Just ly) -> getPrecision >>= \p ->
     let m = Prelude.max (bitLength lx) (bitLength ly)
         z = Logical { bits = bits lx .|. bits ly
                     , bitLength = maybe m (Prelude.min m) p }
     in return (fromLogical z)
   _ -> invalidOperation qNaN
+or x y = generalRules2 x y
 
 {- $doctest-or
 >>> op2 Op.or "0" "0"
@@ -1380,13 +1370,14 @@ or x y = case (toLogical x, toLogical y) of
 -- one of the corresponding operand digits is 1 and the other is 0; otherwise
 -- it is 0.
 xor :: Precision p => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-xor x y = case (toLogical x, toLogical y) of
+xor x@Num{} y@Num{} = case (toLogical x, toLogical y) of
   (Just lx, Just ly) -> getPrecision >>= \p ->
     let m = Prelude.max (bitLength lx) (bitLength ly)
         z = Logical { bits = bits lx `Bits.xor` bits ly
                     , bitLength = maybe m (Prelude.min m) p }
     in return (fromLogical z)
   _ -> invalidOperation qNaN
+xor x y = generalRules2 x y
 
 {- $doctest-xor
 >>> op2 Op.xor "0" "0"
@@ -1413,11 +1404,12 @@ xor x y = case (toLogical x, toLogical y) of
 -- result is the inverse of the corresponding digit of the operand. A result
 -- digit is 1 if the corresponding operand digit is 0; otherwise it is 0.
 invert :: FinitePrecision p => Decimal a b -> Arith p r (Decimal p r)
-invert x = case toLogical x of
+invert x@Num{} = case toLogical x of
   Just lx -> getPrecision >>= \(Just p) ->
     let z = Logical { bits = complement (bits lx), bitLength = p }
     in return (fromLogical z)
   _ -> invalidOperation qNaN
+invert x = generalRules1 x
 
 {- $doctest-invert
 >>> op1 Op.invert "0"
@@ -1907,8 +1899,7 @@ logb Num { coefficient = c, exponent = e }
   | otherwise = roundDecimal (fromInteger r :: Decimal PInfinite RoundHalfEven)
   where r = fromIntegral (numDigits c) - 1 + fromIntegral e :: Integer
 logb Inf{} = return Inf { sign = Pos }
-logb n@QNaN{} = return (coerce n)
-logb n@SNaN{} = invalidOperation n
+logb x = generalRules1 x
 
 {- $doctest-logb
 >>> op1 Op.logb "250"
@@ -2005,7 +1996,8 @@ shift n@Num { coefficient = c } s@Num { sign = d, coefficient = sc }
           Neg -> n { coefficient =  c `quot` 10 ^ sc }
 shift n@Inf{}  s | validShift z s = return z where z = coerce n
 shift n@QNaN{} s | validShift z s = return z where z = coerce n
-shift n        _                  = invalidOperation n
+shift n@SNaN{} _                  = invalidOperation n
+shift _        s                  = invalidOperation s
 
 validShift :: Precision p => p -> Decimal a b -> Bool
 validShift px Num { coefficient = c, exponent = 0 } =
@@ -2065,7 +2057,8 @@ rotate n@Num { coefficient = c } s@Num { sign = d, coefficient = sc }
         sc'    = p - fromIntegral sc
 rotate n@Inf{}  s | validShift z s = return z where z = coerce n
 rotate n@QNaN{} s | validShift z s = return z where z = coerce n
-rotate n        _                  = invalidOperation n
+rotate n@SNaN{} _                  = invalidOperation n
+rotate _        s                  = invalidOperation s
 
 {- $doctest-rotate
 >>> op2 Op.rotate "34" "8"
