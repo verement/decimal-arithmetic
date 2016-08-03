@@ -145,39 +145,46 @@ instance Precision p => Precision (Decimal p r) where
     where decimalPrecision :: Decimal p r -> p
           decimalPrecision = undefined
 
-evalOp :: Arith p r (Decimal p r) -> Decimal p r
-evalOp op = either exceptionResult id $ evalArith op newContext
+-- This assumes the arithmetic operation does not trap any signals, which
+-- could result in an exception being thrown (and returned in a Left value).
+evalOp :: Arith p r a -> a
+evalOp op = let Right r = evalArith op newContext in r
 
+compareDecimal :: Decimal a b -> Decimal c d -> Either GeneralDecimal Ordering
+compareDecimal x y = evalOp (x `Op.compare` y)
 
+-- | Note that NaN values are not equal to any value, including other NaNs.
 instance Eq (Decimal p r) where
-  x == y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
-    Num { coefficient = 0 } -> True
-    _                       -> False
+  x == y = case compareDecimal x y of
+    Right EQ -> True
+    _        -> False
 
-instance (Precision p, Rounding r) => Ord (Decimal p r) where
-  x `compare` y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
-    Num { coefficient = 0 } -> EQ
-    Num { sign = Neg      } -> LT
-    Num { sign = Pos      } -> GT
-    _                       -> GT  -- match Prelude behavior for NaN
+-- | Unlike the instances for 'Float' and 'Double', the 'compare' method in
+-- this instance uses a total ordering over all possible values. Note that
+-- @'compare' x y == 'EQ'@ does not imply @x == y@ (and similarly for 'LT' and
+-- 'GT') in the cases where @x@ or @y@ are NaN values.
+instance Ord (Decimal p r) where
+  compare x y = case compareDecimal x y of
+    Right o -> o
+    Left _  -> evalOp (x `Op.compareTotal` y)
 
-  x < y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
-    Num { sign = Neg      } -> True
-    _                       -> False
+  x < y = case compareDecimal x y of
+    Right LT -> True
+    _        -> False
 
-  x <= y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
-    Num { sign = Neg      } -> True
-    Num { coefficient = 0 } -> True
-    _                       -> False
+  x <= y = case compareDecimal x y of
+    Right LT -> True
+    Right EQ -> True
+    _        -> False
 
-  x > y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
-    Num { coefficient = 0 } -> False
-    Num { sign = Pos      } -> True
-    _                       -> False
+  x > y = case compareDecimal x y of
+    Right GT -> True
+    _        -> False
 
-  x >= y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
-    Num { sign = Pos      } -> True
-    _                       -> False
+  x >= y = case compareDecimal x y of
+    Right GT -> True
+    Right EQ -> True
+    _        -> False
 
   max x y = evalOp (Op.max x y)
   min x y = evalOp (Op.min x y)

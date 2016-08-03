@@ -11,6 +11,7 @@ module Numeric.Decimal.Operation
        , minus
        , abs
        , compare
+       , compareTotal
        , min
        , max
        , power
@@ -48,12 +49,11 @@ minus    :: (Precision p, Rounding r)
          => Decimal a b -> Arith p r (Decimal p r)
 abs      :: (Precision p, Rounding r)
          => Decimal a b -> Arith p r (Decimal p r)
-compare  :: (Precision p, Rounding r)
-         => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-min      :: (Precision p, Rounding r)
-         => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
-max      :: (Precision p, Rounding r)
-         => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
+compare  :: Decimal a b -> Decimal c d
+         -> Arith p r (Either (Decimal p r) Ordering)
+compareTotal :: Decimal a b -> Decimal c d -> Arith p r Ordering
+min      :: Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
+max      :: Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
 power    :: (FinitePrecision p, Rounding r)
          => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 squareRoot :: FinitePrecision p

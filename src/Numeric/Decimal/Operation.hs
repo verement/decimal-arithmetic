@@ -735,57 +735,66 @@ abs x
 -- either operand is a /special value/ then the general rules apply. No flags
 -- are set unless an operand is a signaling NaN.
 --
--- Otherwise, the operands are compared, returning @−1@ if the first is less
--- than the second, @0@ if they are equal, or @1@ if the first is greater than
--- the second.
-compare :: (Precision p, Rounding r)
-        => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-compare x@Num{} y@Num{} = nzp <$> (xn `subtract` yn)
+-- Otherwise, the operands are compared, returning @'Right' 'LT'@ if the first
+-- is less than the second, @'Right' 'EQ'@ if they are equal, or @'Right'
+-- 'GT'@ if the first is greater than the second.
+--
+-- A 'Left' value is returned if the result is NaN, indicating an “unordered”
+-- comparison (see IEEE 754 §5.11).
+compare :: Decimal a b -> Decimal c d
+        -> Arith p r (Either (Decimal p r) Ordering)
+compare x@Num{} y@Num{} = nzp <$> subArith (subtract' xn yn)
 
-  where (xn, yn) | sign x /= sign y = (nzp x, nzp y)
+  where subtract' :: Decimal a b -> Decimal c d
+                  -> Arith PInfinite RoundHalfEven
+                     (Decimal PInfinite RoundHalfEven)
+        subtract' = subtract
+
+        (xn, yn) | sign x /= sign y = (either id fromOrdering $ nzp x,
+                                       either id fromOrdering $ nzp y)
                  | otherwise        = (x, y)
 
-        nzp :: Decimal p r -> Decimal p r
+        nzp :: Decimal a b -> Either (Decimal p r) Ordering
         nzp Num { sign = s, coefficient = c }
-          | c == 0    = zero
-          | s == Pos  = one
-          | otherwise = negativeOne
-        nzp Inf { sign = s }
-          | s == Pos  = one
-          | otherwise = negativeOne
-        nzp n = toQNaN n
+          | c == 0    = Right EQ
+          | s == Pos  = Right GT
+          | otherwise = Right LT
+        nzp Inf { sign = s } = case s of
+          Pos -> Right GT
+          Neg -> Right LT
+        nzp n = Left (toQNaN n)
 
-compare Inf { sign = xs } Inf { sign = ys }
-  | xs == ys  = return zero
-  | xs == Neg = return negativeOne
-  | otherwise = return one
-compare Inf { sign = xs } Num { }
-  | xs == Neg = return negativeOne
-  | otherwise = return one
-compare Num { } Inf { sign = ys }
-  | ys == Pos = return negativeOne
-  | otherwise = return one
-compare nan@SNaN{} _ = invalidOperation nan
-compare _ nan@SNaN{} = invalidOperation nan
-compare x y          = return (toQNaN2 x y)
+compare Inf { sign = xs } Inf { sign = ys } = return $ case (xs, ys) of
+  (Pos, Neg) -> Right GT
+  (Neg, Pos) -> Right LT
+  _          -> Right EQ
+compare Inf { sign = xs } Num { } = return $ case xs of
+  Pos -> Right GT
+  Neg -> Right LT
+compare Num { } Inf { sign = ys } = return $ case ys of
+  Pos -> Right LT
+  Neg -> Right GT
+compare nan@SNaN{} _ = Left <$> invalidOperation nan
+compare _ nan@SNaN{} = Left <$> invalidOperation nan
+compare x y          = return (Left $ toQNaN2 x y)
 
 {- $doctest-compare
->>> op2 Op.compare "2.1" "3"
+>>> either id fromOrdering $ op2 Op.compare "2.1" "3"
 -1
 
->>> op2 Op.compare "2.1" "2.1"
+>>> either id fromOrdering $ op2 Op.compare "2.1" "2.1"
 0
 
->>> op2 Op.compare "2.1" "2.10"
+>>> either id fromOrdering $ op2 Op.compare "2.1" "2.10"
 0
 
->>> op2 Op.compare "3" "2.1"
+>>> either id fromOrdering $ op2 Op.compare "3" "2.1"
 1
 
->>> op2 Op.compare "2.1" "-3"
+>>> either id fromOrdering $ op2 Op.compare "2.1" "-3"
 1
 
->>> op2 Op.compare "-3" "2.1"
+>>> either id fromOrdering $ op2 Op.compare "-3" "2.1"
 -1
 -}
 
@@ -794,8 +803,8 @@ compare x y          = return (toQNaN2 x y)
 -- neither operand is a signaling NaN then any quiet NaN operand is treated as
 -- though it were a signaling NaN. (That is, all NaNs signal, with signaling
 -- NaNs taking precedence over quiet NaNs.)
-compareSignal :: (Precision p, Rounding r)
-              => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+compareSignal :: Decimal a b -> Decimal c d
+              -> Arith p r (Either (Decimal p r) Ordering)
 compareSignal x@SNaN{} y        =               x `compare`               y
 compareSignal x        y@SNaN{} =               x `compare`               y
 compareSignal x        y        = quietToSignal x `compare` quietToSignal y
@@ -804,8 +813,7 @@ compareSignal x        y        = quietToSignal x `compare` quietToSignal y
 -- the maximum. If either operand is a NaN then the general rules apply,
 -- unless one is a quiet NaN and the other is numeric, in which case the
 -- numeric operand is returned.
-max :: (Precision p, Rounding r)
-    => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
+max :: Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
 max x y = snd <$> minMax id x y
 
 {- $doctest-max
@@ -829,16 +837,14 @@ max x y = snd <$> minMax id x y
 -- operand is returned (that is, with the original sign). If, without signs,
 -- the second operand is the larger then the original second operand is
 -- returned. Otherwise the result is the same as from the 'max' operation.
-maxMagnitude :: (Precision p, Rounding r)
-             => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
+maxMagnitude :: Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
 maxMagnitude x y = snd <$> minMax withoutSign x y
 
 -- | 'min' takes two operands, compares their values numerically, and returns
 -- the minimum. If either operand is a NaN then the general rules apply,
 -- unless one is a quiet NaN and the other is numeric, in which case the
 -- numeric operand is returned.
-min :: (Precision p, Rounding r)
-    => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
+min :: Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
 min x y = fst <$> minMax id x y
 
 {- $doctest-min
@@ -862,36 +868,32 @@ min x y = fst <$> minMax id x y
 -- operand is returned (that is, with the original sign). If, without signs,
 -- the second operand is the smaller then the original second operand is
 -- returned. Otherwise the result is the same as from the 'min' operation.
-minMagnitude :: (Precision p, Rounding r)
-             => Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
+minMagnitude :: Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
 minMagnitude x y = fst <$> minMax withoutSign x y
 
 -- | Ordering function for 'min', 'minMagnitude', 'max', and 'maxMagnitude':
 -- returns the original arguments as (smaller, larger) when the given function
 -- is applied to them.
-minMax :: (Precision p, Rounding r)
-       => (Decimal a b -> Decimal a b) -> Decimal a b -> Decimal a b
+minMax :: (Decimal a b -> Decimal a b) -> Decimal a b -> Decimal a b
        -> Arith p r (Decimal a b, Decimal a b)
 minMax _ x@Num{}  QNaN{} = return (x, x)
 minMax _ x@Inf{}  QNaN{} = return (x, x)
 minMax _  QNaN{} y@Num{} = return (y, y)
 minMax _  QNaN{} y@Inf{} = return (y, y)
 
-minMax f x y = do
-  c <- f x `compare` f y
-  return $ case c of
-    Num { coefficient = 0 } -> case (sign x, sign y) of
-      (Neg, Pos) -> (x, y)
-      (Pos, Neg) -> (y, x)
-      (Pos, Pos) -> case (x, y) of
-        (Num { exponent = xe }, Num { exponent = ye }) | xe > ye -> (y, x)
-        _ -> (x, y)
-      (Neg, Neg) -> case (x, y) of
-        (Num { exponent = xe }, Num { exponent = ye }) | xe < ye -> (y, x)
-        _ -> (x, y)
-    Num { sign = Pos } -> (y, x)
-    Num { sign = Neg } -> (x, y)
-    nan -> let nan' = coerce nan in (nan', nan')
+minMax f x y = f x `compare` f y >>= \c -> return $ case c of
+  Right LT -> (x, y)
+  Right GT -> (y, x)
+  Right EQ -> case (sign x, sign y) of
+    (Neg, Pos) -> (x, y)
+    (Pos, Neg) -> (y, x)
+    (Pos, Pos) -> case (x, y) of
+      (Num { exponent = xe }, Num { exponent = ye }) | xe > ye -> (y, x)
+      _ -> (x, y)
+    (Neg, Neg) -> case (x, y) of
+      (Num { exponent = xe }, Num { exponent = ye }) | xe < ye -> (y, x)
+      _ -> (x, y)
+  Left nan -> let nan' = coerce nan in (nan', nan')
 
 withoutSign :: Decimal p r -> Decimal p r
 withoutSign n = n { sign = Pos }
@@ -1159,16 +1161,19 @@ squareRoot n@Num { sign = s, coefficient = c, exponent = e }
                    => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
         subRounded = subArith . roundDecimal
 
-        exactness :: Decimal a b -> Arith p r (Decimal PInfinite RoundHalfEven)
-        exactness r = subArith (multiply r r >>= compare n)
+        exactness :: Decimal a b -> Arith p r
+                     (Either (Decimal p r) Ordering)
+        exactness r = subArith (multiply' r r) >>= compare n
+          where multiply' :: Decimal a b -> Decimal c d
+                          -> Arith PInfinite RoundHalfEven
+                             (Decimal PInfinite RoundHalfEven)
+                multiply' = multiply
 
         result :: Decimal p a -> Arith p r (Decimal p a)
-        result r = do
-          e <- exactness r
-          if Number.isZero e
-            then return (reduced r)
-            else let r' = coerce r
-                 in coerce <$> (raiseSignal Rounded =<< raiseSignal Inexact r')
+        result r = exactness r >>= \e -> case e of
+          Right EQ -> return (reduced r)
+          _ -> let r' = coerce r
+               in coerce <$> (raiseSignal Rounded =<< raiseSignal Inexact r')
 
         approx :: Decimal p r
         approx | even ae   = n { coefficient = 2, exponent =  ae      `quot` 2 }
