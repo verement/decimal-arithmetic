@@ -74,17 +74,6 @@ import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
 import Numeric.Decimal.Rounding
 
--- | A decimal floating point number with 9 digits of precision, rounding half
--- up
-type BasicDecimal = Decimal P9 RoundHalfUp
-
--- | A decimal floating point number with selectable precision, rounding half
--- even
-type ExtendedDecimal p = Decimal p RoundHalfEven
-
--- | A decimal floating point number with infinite precision
-type GeneralDecimal = ExtendedDecimal PInfinite
-
 {- $usage
 
 You should choose a decimal number type with appropriate precision and

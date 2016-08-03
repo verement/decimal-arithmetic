@@ -11,6 +11,10 @@ module Numeric.Decimal.Number
        , Payload
 
        , Decimal(..)
+       , BasicDecimal
+       , ExtendedDecimal
+       , GeneralDecimal
+
        , zero
        , oneHalf
        , one
@@ -104,6 +108,17 @@ data Decimal p r
          , payload     :: Payload
          }
 
+-- | A decimal floating point number with 9 digits of precision, rounding half
+-- up
+type BasicDecimal = Decimal P9 RoundHalfUp
+
+-- | A decimal floating point number with selectable precision, rounding half
+-- even
+type ExtendedDecimal p = Decimal p RoundHalfEven
+
+-- | A decimal floating point number with infinite precision
+type GeneralDecimal = ExtendedDecimal PInfinite
+
 -- | The 'Show' instance uses the 'toScientificString' operation from
 -- "Numeric.Decimal.Conversion".
 instance Show (Decimal p r) where
@@ -133,7 +148,6 @@ instance Precision p => Precision (Decimal p r) where
 evalOp :: Arith p r (Decimal p r) -> Decimal p r
 evalOp op = either exceptionResult id $ evalArith op newContext
 
-type GeneralDecimal = Decimal PInfinite RoundHalfEven
 
 instance Eq (Decimal p r) where
   x == y = case evalOp (x `Op.compare` y) :: GeneralDecimal of
