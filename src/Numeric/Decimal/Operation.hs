@@ -1236,11 +1236,10 @@ specification; confirmed with Mike Cowlishaw on 2016-08-02.
 -- never rounded and the only /flag/ that might be set is /invalid-operation/
 -- (set if an operand is not a valid logical operand).
 --
--- Some operations return a boolean value that is described as 0 or 1 in the
--- documentation below. For reasons of efficiency, and as permitted by the
--- /General Decimal Arithmetic Specification/, these operations return a
--- 'Bool' in this implementation, but can be converted to 'Decimal' via
--- 'fromBool'.
+-- Some operations return a boolean value described as 0 or 1 in the
+-- /General Decimal Arithmetic Specification/, but which is returned as a
+-- 'Bool' in this implementation. These values can be converted to 'Decimal'
+-- via 'fromBool'.
 --
 -- Similarly, the total ordering operations return an 'Ordering' value in this
 -- implementation, but can be converted to 'Decimal' via 'fromOrdering'.
@@ -1660,16 +1659,16 @@ copySign n m = return n { sign = sign m }
 -1.50
 -}
 
--- | 'isCanonical' takes one operand. The result is 1 if the operand is
--- /canonical/; otherwise it is 0. The definition of /canonical/ is
+-- | 'isCanonical' takes one operand. The result is 'True' if the operand is
+-- /canonical/; otherwise it is 'False'. The definition of /canonical/ is
 -- implementation-defined; if more than one internal encoding for a given NaN,
 -- Infinity, or finite number is possible then one “preferred” encoding is
 -- deemed canonical. This operation then tests whether the internal encoding
 -- is that preferred encoding.
 --
 -- If all possible operands have just one internal encoding each, then
--- 'isCanonical' always returns 1. This operation is unaffected by context and
--- is quiet — no /flags/ are changed in the context.
+-- 'isCanonical' always returns 'True'. This operation is unaffected by
+-- context and is quiet — no /flags/ are changed in the context.
 isCanonical :: Decimal a b -> Arith p r Bool
 isCanonical _ = return True
 
@@ -1678,10 +1677,10 @@ isCanonical _ = return True
 1
 -}
 
--- | 'isFinite' takes one operand. The result is 1 if the operand is neither
--- infinite nor a NaN (that is, it is a normal number, a subnormal number, or
--- a zero); otherwise it is 0. This operation is unaffected by context and is
--- quiet — no /flags/ are changed in the context.
+-- | 'isFinite' takes one operand. The result is 'True' if the operand is
+-- neither infinite nor a NaN (that is, it is a normal number, a subnormal
+-- number, or a zero); otherwise it is 'False'. This operation is unaffected
+-- by context and is quiet — no /flags/ are changed in the context.
 isFinite :: Decimal a b -> Arith p r Bool
 isFinite = return . Number.isFinite
 
@@ -1702,9 +1701,9 @@ isFinite = return . Number.isFinite
 0
 -}
 
--- | 'isInfinite' takes one operand. The result is 1 if the operand is an
--- Infinity; otherwise it is 0. This operation is unaffected by context and is
--- quiet — no /flags/ are changed in the context.
+-- | 'isInfinite' takes one operand. The result is 'True' if the operand is an
+-- Infinity; otherwise it is 'False'. This operation is unaffected by context
+-- and is quiet — no /flags/ are changed in the context.
 isInfinite :: Decimal a b -> Arith p r Bool
 isInfinite n = return $ case n of
   Inf{} -> True
@@ -1721,9 +1720,9 @@ isInfinite n = return $ case n of
 0
 -}
 
--- | 'isNaN' takes one operand. The result is 1 if the operand is a NaN (quiet
--- or signaling); otherwise it is 0. This operation is unaffected by context
--- and is quiet — no /flags/ are changed in the context.
+-- | 'isNaN' takes one operand. The result is 'True' if the operand is a NaN
+-- (quiet or signaling); otherwise it is 'False'. This operation is unaffected
+-- by context and is quiet — no /flags/ are changed in the context.
 isNaN :: Decimal a b -> Arith p r Bool
 isNaN n = return $ case n of
   QNaN{} -> True
@@ -1741,9 +1740,9 @@ isNaN n = return $ case n of
 1
 -}
 
--- | 'isNormal' takes one operand. The result is 1 if the operand is a
--- positive or negative /normal number/; otherwise it is 0. This operation is
--- quiet; no /flags/ are changed in the context.
+-- | 'isNormal' takes one operand. The result is 'True' if the operand is a
+-- positive or negative /normal number/; otherwise it is 'False'. This
+-- operation is quiet; no /flags/ are changed in the context.
 isNormal :: Precision a => Decimal a b -> Arith p r Bool
 isNormal = return . Number.isNormal
 
@@ -1764,9 +1763,9 @@ isNormal = return . Number.isNormal
 0
 -}
 
--- | 'isQNaN' takes one operand. The result is 1 if the operand is a quiet
--- NaN; otherwise it is 0. This operation is unaffected by context and is
--- quiet — no /flags/ are changed in the context.
+-- | 'isQNaN' takes one operand. The result is 'True' if the operand is a
+-- quiet NaN; otherwise it is 'False'. This operation is unaffected by context
+-- and is quiet — no /flags/ are changed in the context.
 isQNaN :: Decimal a b -> Arith p r Bool
 isQNaN n = return $ case n of
   QNaN{} -> True
@@ -1783,9 +1782,9 @@ isQNaN n = return $ case n of
 0
 -}
 
--- | 'isSigned' takes one operand. The result is 1 if the /sign/ of the
--- operand is 1; otherwise it is 0. This operation is unaffected by context
--- and is quiet — no /flags/ are changed in the context.
+-- | 'isSigned' takes one operand. The result is 'True' if the /sign/ of the
+-- operand is 1; otherwise it is 'False'. This operation is unaffected by
+-- context and is quiet — no /flags/ are changed in the context.
 isSigned :: Decimal a b -> Arith p r Bool
 isSigned = return . Number.isNegative
 
@@ -1800,9 +1799,9 @@ isSigned = return . Number.isNegative
 1
 -}
 
--- | 'isSNaN' takes one operand. The result is 1 if the operand is a signaling
--- NaN; otherwise it is 0. This operation is unaffected by context and is
--- quiet — no /flags/ are changed in the context.
+-- | 'isSNaN' takes one operand. The result is 'True' if the operand is a
+-- signaling NaN; otherwise it is 'False'. This operation is unaffected by
+-- context and is quiet — no /flags/ are changed in the context.
 isSNaN :: Decimal a b -> Arith p r Bool
 isSNaN n = return $ case n of
   SNaN{} -> True
@@ -1819,9 +1818,9 @@ isSNaN n = return $ case n of
 1
 -}
 
--- | 'isSubnormal' takes one operand. The result is 1 if the operand is a
--- positive or negative /subnormal number/; otherwise it is 0. This operation
--- is quiet; no /flags/ are changed in the context.
+-- | 'isSubnormal' takes one operand. The result is 'True' if the operand is a
+-- positive or negative /subnormal number/; otherwise it is 'False'. This
+-- operation is quiet; no /flags/ are changed in the context.
 isSubnormal :: Precision a => Decimal a b -> Arith p r Bool
 isSubnormal = return . Number.isSubnormal
 
@@ -1842,9 +1841,9 @@ isSubnormal = return . Number.isSubnormal
 0
 -}
 
--- | 'isZero' takes one operand. The result is 1 if the operand is a zero;
--- otherwise it is 0. This operation is unaffected by context and is quiet —
--- no /flags/ are changed in the context.
+-- | 'isZero' takes one operand. The result is 'True' if the operand is a
+-- zero; otherwise it is 'False'. This operation is unaffected by context and
+-- is quiet — no /flags/ are changed in the context.
 isZero :: Decimal a b -> Arith p r Bool
 isZero = return . Number.isZero
 
@@ -1906,12 +1905,12 @@ radix = return radix'
 10
 -}
 
--- | 'sameQuantum' takes two operands, and returns 1 if the two operands have
--- the same /exponent/ or 0 otherwise. The result is never affected by either
--- the sign or the coefficient of either operand.
+-- | 'sameQuantum' takes two operands, and returns 'True' if the two operands
+-- have the same /exponent/ or 'False' otherwise. The result is never affected
+-- by either the sign or the coefficient of either operand.
 --
--- If either operand is a /special value/, 1 is returned only if both operands
--- are NaNs or both are infinities.
+-- If either operand is a /special value/, 'True' is returned only if both
+-- operands are NaNs or both are infinities.
 --
 -- 'sameQuantum' does not change any /flags/ in the context.
 sameQuantum :: Decimal a b -> Decimal c d -> Arith p r Bool
