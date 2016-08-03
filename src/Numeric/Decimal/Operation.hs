@@ -328,7 +328,7 @@ multiply x y = return (toQNaN2 x y)
 -- * If the operand is +Infinity, the result is +Infinity and exact.
 --
 -- * Otherwise the result is inexact and will be rounded using the
--- /round-half-even/ algorithm. The coefficient will have exactly /precision/
+-- 'RoundHalfEven' algorithm. The coefficient will have exactly /precision/
 -- digits (unless the result is subnormal). These inexact results should be
 -- correctly rounded, but may be up to 1 ulp (unit in last place) in error.
 exp :: FinitePrecision p => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
@@ -449,7 +449,7 @@ fusedMultiplyAdd x y z =
 -- * If the operand equals one, the result is 0 and exact.
 --
 -- * Otherwise the result is inexact and will be rounded using the
--- /round-half-even/ algorithm. The coefficient will have exactly /precision/
+-- 'RoundHalfEven' algorithm. The coefficient will have exactly /precision/
 -- digits (unless the result is subnormal). These inexact results should be
 -- correctly rounded, but may be up to 1 ulp (unit in last place) in error.
 ln :: FinitePrecision p => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
@@ -548,7 +548,7 @@ Infinity
 -- exact.
 --
 -- * Otherwise the result is inexact and will be rounded using the
--- /round-half-even/ algorithm. The coefficient will have exactly /precision/
+-- 'RoundHalfEven' algorithm. The coefficient will have exactly /precision/
 -- digits (unless the result is subnormal). These inexact results should be
 -- correctly rounded, but may be up to 1 ulp (unit in last place) in error.
 log10 :: FinitePrecision p => Decimal a b -> Arith p r (Decimal p RoundHalfEven)
@@ -1128,8 +1128,8 @@ reduce n = reduce' <$> plus n
 -- operand. If no rounding is necessary (the exact result requires /precision/
 -- digits or fewer) then the coefficient and exponent giving the correct value
 -- and with the exponent closest to the ideal exponent is used. If the result
--- must be inexact, it is rounded using the /round-half-even/ algorithm and
--- the coefficient will have exactly /precision/ digits (unless the result is
+-- must be inexact, it is rounded using the 'RoundHalfEven' algorithm and the
+-- coefficient will have exactly /precision/ digits (unless the result is
 -- subnormal), and the exponent will be set to maintain the correct value.
 --
 -- Otherwise (the operand is equal to zero), the result will be the zero with
