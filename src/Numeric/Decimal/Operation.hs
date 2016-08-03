@@ -1470,8 +1470,8 @@ class_ n = return $ case n of
          | Number.isSubnormal n -> NumberClass (sign n) SubnormalClass
          | otherwise            -> NumberClass (sign n) NormalClass
   Inf {}                        -> NumberClass (sign n) InfinityClass
-  QNaN{}                        -> NaNClass QNaNClass
-  SNaN{}                        -> NaNClass SNaNClass
+  QNaN{}                        -> NaNClass QuietClass
+  SNaN{}                        -> NaNClass SignalingClass
 
 data Class = NumberClass Sign NumberClass -- ^ Number (finite or infinite)
            | NaNClass NaNClass            -- ^ Not a number (quiet or signaling)
@@ -1483,15 +1483,15 @@ data NumberClass = ZeroClass       -- ^ Zero
                  | InfinityClass   -- ^ Infinity
                  deriving Eq
 
-data NaNClass = QNaNClass  -- ^ Not a number (quiet)
-              | SNaNClass  -- ^ Not a number (signaling)
+data NaNClass = QuietClass      -- ^ Quiet NaN
+              | SignalingClass  -- ^ Signaling NaN
               deriving Eq
 
 instance Show Class where
   show c = case c of
-    NumberClass s nc   -> signChar s : showNumberClass nc
-    NaNClass QNaNClass ->       nan
-    NaNClass SNaNClass -> 's' : nan
+    NumberClass s nc        -> signChar s : showNumberClass nc
+    NaNClass QuietClass     ->       nan
+    NaNClass SignalingClass -> 's' : nan
 
     where signChar :: Sign -> Char
           signChar Pos = '+'
