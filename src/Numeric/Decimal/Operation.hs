@@ -900,7 +900,40 @@ withoutSign n = n { sign = Pos }
 
 -- | 'power' takes two operands, and raises a number (the left-hand operand)
 -- to a power (the right-hand operand). If either operand is a /special value/
--- then the general rules apply, except in certain cases.
+-- then the general rules apply, except as stated below.
+--
+-- The following rules apply:
+--
+-- * If both operands are zero, or if the left-hand operand is less than zero
+-- and the right-hand operand does not have an integral value or is infinite,
+-- an Invalid operation condition is raised, the result is NaN, and the
+-- following rules do not apply.
+--
+-- * If the left-hand operand is infinite, the result will be exact and will
+-- be infinite if the right-hand side is positive, 1 if the right-hand side is
+-- a zero, and 0 if the right-hand side is negative.
+--
+-- * If the left-hand operand is a zero, the result will be exact and will be
+-- infinite if the right-hand side is negative or 0 if the right-hand side is
+-- positive.
+--
+-- * If the right-hand operand is a zero, the result will be 1 and exact.
+--
+-- * In cases not covered above, the result will be inexact unless the
+-- right-hand side has an integral value and the result is finite and can be
+-- expressed exactly within /precision/ digits. In this latter case, if the
+-- result is unrounded then its exponent will be that which would result if
+-- the operation were calculated by repeated multiplication (if the second
+-- operand is negative then the reciprocal of the first operand is used, with
+-- the absolute value of the second operand determining the multiplications).
+--
+-- * Inexact finite results should be correctly rounded, but may be up to 1
+-- ulp (unit in last place) in error.
+--
+-- * The /sign/ of the result will be 1 only if the right-hand side has an
+-- integral value and is odd (and is not infinite) and also the /sign/ of the
+-- left-hand side is 1. In all other cases, the /sign/ of the result will be
+-- 0.
 power :: (FinitePrecision p, Rounding r)
       => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 power x@Num { coefficient = 0 } y@Num{}
