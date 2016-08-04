@@ -1,7 +1,7 @@
 
 module Numeric.Decimal.Rounding
        ( RoundingAlgorithm(..)
-       , Rounding(..)
+       , Rounding(rounding)
 
        , RoundDown
        , RoundHalfUp
@@ -14,6 +14,8 @@ module Numeric.Decimal.Rounding
        , Round05Up
 
        , getRounder
+       , Rounder
+
        , roundDecimal
        ) where
 
