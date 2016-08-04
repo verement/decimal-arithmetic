@@ -38,10 +38,11 @@ library
   hs-source-dirs:      src
 
   exposed-modules:     Numeric.Decimal
-                       Numeric.Decimal.Conversion
                        Numeric.Decimal.Arithmetic
+                       Numeric.Decimal.Conversion
                        Numeric.Decimal.Operation
-  other-modules:       Numeric.Decimal.Number
+  other-modules:       Numeric.Decimal.Exception
+                       Numeric.Decimal.Number
                        Numeric.Decimal.Precision
                        Numeric.Decimal.Rounding
 

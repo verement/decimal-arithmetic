@@ -21,9 +21,10 @@ import Prelude hiding (exponent)
 
 import Data.Coerce (coerce)
 
+import {-# SOURCE #-} Numeric.Decimal.Arithmetic
+import {-# SOURCE #-} Numeric.Decimal.Exception
 import {-# SOURCE #-} Numeric.Decimal.Number
 import                Numeric.Decimal.Precision
-import {-# SOURCE #-} Numeric.Decimal.Arithmetic
 
 -- | A value representation of a rounding algorithm (cf. 'Rounding').
 data RoundingAlgorithm = RoundDown
@@ -68,11 +69,8 @@ roundDecimal n@Num { sign = s, coefficient = c, exponent = e } = do
           n'     = case excessDigits c' =<< p of
             Nothing -> n { coefficient = c'          , exponent =      e' }
             _       -> n { coefficient = c' `quot` 10, exponent = succ e' }
-          rounded :: Decimal p r -> Arith p r (Decimal p r)
-          rounded
-            | r /= 0    = raiseSignal Inexact
-            | otherwise = return
-      raiseSignal Rounded =<< rounded n'  -- XXX check for overflow
+      rounded =<< (if r /= 0 then inexact else return) n'
+      -- XXX check for overflow
 
     Nothing -> return (coerce n)
 

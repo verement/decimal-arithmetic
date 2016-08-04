@@ -117,6 +117,7 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Bits as Bits
 
 import Numeric.Decimal.Arithmetic
+import Numeric.Decimal.Exception
 import Numeric.Decimal.Number hiding (isFinite, isNormal, isSubnormal, isZero)
 import Numeric.Decimal.Precision
 import Numeric.Decimal.Rounding
@@ -138,11 +139,6 @@ roundingAlg = rounding . arithRounding
 result :: (Precision p, Rounding r) => Decimal p r -> Arith p r (Decimal p r)
 result = roundDecimal  -- ...
 --  | maybe False (numDigits c >) (precision r) = undefined
-
-invalidOperation :: Decimal a b -> Arith p r (Decimal p r)
-invalidOperation n = raiseSignal InvalidOperation $ case n of
-  SNaN { sign = s, payload = p } -> qNaN { sign = s, payload = p }
-  _                              -> qNaN
 
 generalRules1 :: Decimal a b -> Arith p r (Decimal p r)
 generalRules1 nan@QNaN{} = return (coerce nan)
@@ -629,9 +625,8 @@ Infinity
 divide :: (FinitePrecision p, Rounding r)
        => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 divide dividend@Num{ sign = xs } Num { coefficient = 0, sign = ys }
-  | Number.isZero dividend = invalidOperation qNaN
-  | otherwise              = raiseSignal DivisionByZero
-                             infinity { sign = xorSigns xs ys }
+  | Number.isZero dividend = divisionUndefined
+  | otherwise              = divisionByZero infinity { sign = xorSigns xs ys }
 divide Num { sign = xs, coefficient = xc, exponent = xe }
        Num { sign = ys, coefficient = yc, exponent = ye } = quotient
 
@@ -958,7 +953,7 @@ power :: (FinitePrecision p, Rounding r)
       => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 power x@Num { coefficient = 0 } y@Num{}
   | Number.isZero y     = invalidOperation qNaN
-  | Number.isNegative y = return infinity { sign = powerSign x y }
+  | Number.isNegative y = divisionByZero infinity { sign = powerSign x y }
   | otherwise           = return zero     { sign = powerSign x y }
 power x@Num{} y@Num{} = case integralValue y of
   Just i  | i < 0               -> reciprocal x >>= \rx -> integralPower rx (-i)
