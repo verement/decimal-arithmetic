@@ -1531,7 +1531,7 @@ invert x = generalRules1 x
 -- effect as 'copy'). This operation is unaffected by context and is quiet —
 -- no /flags/ are changed in the context.
 canonical :: Decimal a b -> Arith p r (Decimal a b)
-canonical = return
+canonical = copy
 
 {- $doctest-canonical
 >>> op1 Op.canonical "2.50"
