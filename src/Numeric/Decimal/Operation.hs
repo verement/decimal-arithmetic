@@ -16,67 +16,92 @@ module Numeric.Decimal.Operation
        ( -- * Arithmetic operations
          -- $arithmetic-operations
 
-         abs
-       , add
+         -- ** General arithmetic
+         add
        , subtract
-       , compare
-       , compareSignal
+       , multiply
        , divide
          -- divideInteger
-       , exp
+         -- remainder
+         -- remainderNear
+       , power
+       , squareRoot
        , fusedMultiplyAdd
+
+         -- ** Exponential and logarithmic
+       , exp
        , ln
        , log10
-       , max
-       , maxMagnitude
-       , min
-       , minMagnitude
-       , minus
+
+         -- ** Unary sign
        , plus
-       , multiply
+       , minus
+       , abs
+
+         -- ** Comparison
+       , compare
+       , compareSignal
+
+       , min
+       , max
+       , minMagnitude
+       , maxMagnitude
+
+         -- ** Rounding and quantization
+
+         -- roundToIntegralExact
+         -- roundToIntegralValue
+       , reduce
+       , quantize
+
          -- nextMinus
          -- nextPlus
          -- nextToward
-       , power
-       , quantize
-       , reduce
-         -- remainder
-         -- remainderNear
-         -- roundToIntegralExact
-         -- roundToIntegralValue
-       , squareRoot
 
          -- * Miscellaneous operations
          -- $miscellaneous-operations
 
+         -- ** Logic and shifting
+         -- $logical-operations
        , and
-       , canonical
-       , class_, Class(..), Sign(..), NumberClass(..), NaNClass(..)
+       , or
+       , xor
+       , invert
+
+       , shift
+       , rotate
+
+         -- ** Predicates
+       , isZero
+       , isSigned
+       , isFinite
+       , isInfinite
+       , isNormal
+       , isSubnormal
+       , isNaN
+       , isQNaN
+       , isSNaN
+       , isCanonical
+
+         -- ** Total comparison and classification
        , compareTotal
        , compareTotalMagnitude
-       , copy
+
+       , class_, Class(..), Sign(..), NumberClass(..), NaNClass(..)
+
+         -- ** Exponent manipulation
+       , logb
+         -- scaleb
+       , sameQuantum
+       , radix
+
+         -- ** Sign manipulation and conversion
        , copyAbs
        , copyNegate
        , copySign
-       , invert
-       , isCanonical
-       , isFinite
-       , isInfinite
-       , isNaN
-       , isNormal
-       , isQNaN
-       , isSigned
-       , isSNaN
-       , isSubnormal
-       , isZero
-       , logb
-       , or
-       , radix
-       , rotate
-       , sameQuantum
-         -- scaleb
-       , shift
-       , xor
+       , copy
+
+       , canonical
        ) where
 
 import Prelude hiding (abs, and, compare, exp, exponent, isInfinite, isNaN,
@@ -1248,15 +1273,6 @@ specification; confirmed with Mike Cowlishaw on 2016-08-02.
 -- including non-numeric comparisons, sign and other manipulations, and
 -- logical operations.
 --
--- The logical operations ('and', 'invert', 'or', and 'xor') take
--- /logical operands/, which are finite numbers with a /sign/ of 0, an
--- /exponent/ of 0, and a /coefficient/ whose digits must all be either 0 or
--- 1. The length of the result will be at most /precision/ digits (all of
--- which will be either 0 or 1); operands are truncated on the left or padded
--- with zeros on the left as necessary. The result of a logical operation is
--- never rounded and the only /flag/ that might be set is /invalid-operation/
--- (set if an operand is not a valid logical operand).
---
 -- Some operations return a boolean value described as 0 or 1 in the
 -- /General Decimal Arithmetic Specification/, but which is returned as a
 -- 'Bool' in this implementation. These values can be converted to 'Decimal'
@@ -1292,6 +1308,17 @@ fromLogical Logical { bits = b, bitLength = l } =
           | otherwise   = fromBits i' r'  c
           where i' = succ i
                 r' = r * 10
+
+-- $logical-operations
+--
+-- The logical operations ('and', 'or', 'xor', and 'invert') take
+-- /logical operands/, which are finite numbers with a /sign/ of 0, an
+-- /exponent/ of 0, and a /coefficient/ whose digits must all be either 0 or
+-- 1. The length of the result will be at most /precision/ digits (all of
+-- which will be either 0 or 1); operands are truncated on the left or padded
+-- with zeros on the left as necessary. The result of a logical operation is
+-- never rounded and the only /flag/ that might be set is /invalid-operation/
+-- (set if an operand is not a valid logical operand).
 
 -- | 'and' is a logical operation which takes two logical operands. The result
 -- is the digit-wise /and/ of the two operands; each digit of the result is
