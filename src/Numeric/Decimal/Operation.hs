@@ -91,7 +91,7 @@ module Numeric.Decimal.Operation
 
          -- ** Exponent manipulation
        , logb
-         -- scaleb
+       , scaleb
        , sameQuantum
        , radix
 
@@ -1940,6 +1940,39 @@ logb x = generalRules1 x
 
 >>> op1 Op.logb "0"
 -Infinity
+-}
+
+-- | 'scaleb' takes two operands. If either operand is a NaN then the general
+-- arithmetic rules apply. Otherwise, the second operand must be a finite
+-- integer with an exponent of zero and in the range ±2 × (E/max/ +
+-- /precision/) inclusive, where E/max/ is the largest value that can be
+-- returned by the 'logb' operation at the same /precision/ setting. (If is is
+-- not, the Invalid Operation condition is raised and the result is NaN.)
+--
+-- If the first operand is infinite then that Infinity is returned, otherwise
+-- the result is the first operand modified by adding the value of the second
+-- operand to its /exponent/. The result may Overflow or Underflow.
+scaleb :: Decimal a b -> Decimal c d -> Arith p r (Decimal a b)
+scaleb x@Num { exponent = e } s
+  | validScale s = let Just i = integralValue s
+                   in return x { exponent = e + fromInteger i }
+                      -- XXX check for Overflow and Underflow
+scaleb x@Inf{} s | validScale s = return x
+scaleb x y = coerce <$> generalRules2 x y
+
+validScale :: Decimal a b -> Bool
+validScale Num { exponent = 0 } = True  -- XXX
+validScale _                    = False
+
+{- $doctest-scaleb
+>>> op2 Op.scaleb "7.50" "-2"
+0.0750
+
+>>> op2 Op.scaleb "7.50" "0"
+7.50
+
+>>> op2 Op.scaleb "7.50" "3"
+7.50E+3
 -}
 
 -- | 'radix' takes no operands. The result is the radix (base) in which
