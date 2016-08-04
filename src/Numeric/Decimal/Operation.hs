@@ -49,10 +49,10 @@ module Numeric.Decimal.Operation
 
          -- ** Rounding and quantization
 
-         -- roundToIntegralExact
-         -- roundToIntegralValue
-       , reduce
+       , roundToIntegralValue
+       , roundToIntegralExact
        , quantize
+       , reduce
 
          -- nextMinus
          -- nextPlus
@@ -1063,25 +1063,25 @@ NaN
 -- Also unlike other operations, quantize will never raise Underflow, even if
 -- the result is subnormal and inexact.
 quantize :: (Precision p, Rounding r)
-         => Decimal p r -> Decimal a b -> Arith p r (Decimal p r)
+         => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 quantize x@Num { coefficient = xc, exponent = xe } Num { exponent = ye }
   | xe > ye   = result x { coefficient = xc * 10^(xe - ye), exponent = ye }
-  | xe < ye   = rc >>= \c -> return x { coefficient = c, exponent = ye }
-  | otherwise = return x
+  | xe < ye   = rc >>= \c -> result x { coefficient = c, exponent = ye }
+  | otherwise = result x
 
-  where result :: Precision p => Decimal p r -> Arith p r (Decimal p r)
+  where result :: Precision p => Decimal a b -> Arith p r (Decimal p r)
         result x = getPrecision >>= \p -> case numDigits (coefficient x) of
           n | maybe False (n >) p -> invalidOperation qNaN
-          _                       -> return x
+          _                       -> return (coerce x)
 
         rc :: Rounding r => Arith p r Coefficient
         rc = let b      = 10^(ye - xe)
                  (q, r) = xc `quotRem` b
              in getRounder >>= \rounder -> return (rounder (sign x) r b q)
 
-quantize Num{}      Inf{}    = invalidOperation qNaN
-quantize Inf{}      Num{}    = invalidOperation qNaN
-quantize n@Inf{}    Inf{}    = return n
+quantize Num{}   Inf{} = invalidOperation qNaN
+quantize Inf{}   Num{} = invalidOperation qNaN
+quantize x@Inf{} Inf{} = return (coerce x)
 quantize x y = generalRules2 x y
 
 {- $doctest-quantize
@@ -1161,6 +1161,73 @@ reduce n = reduce' <$> plus n
 >>> op1 Op.reduce "0.00"
 0
 -}
+
+-- | 'roundToIntegralExact' takes one operand. If the operand is a
+-- /special value/, or the exponent of the operand is non-negative, then the
+-- result is the same as the operand (unless the operand is a signaling NaN,
+-- as usual).
+--
+-- Otherwise (the operand has a negative exponent) the result is the same as
+-- using the 'quantize' operation using the given operand as the
+-- left-hand-operand, 1E+0 as the right-hand-operand, and the precision of the
+-- operand as the /precision/ setting. The rounding mode is taken from the
+-- context, as usual.
+roundToIntegralExact :: (Precision a, Rounding r)
+                     => Decimal a b -> Arith p r (Decimal a r)
+roundToIntegralExact x@Num { exponent = e }
+  | e >= 0    = return (coerce x)
+  | otherwise =
+      let (Right r, context) = runArith (quantize x one) newContext
+          quantizeFlags = flags context
+
+          maybeRaise :: Signal -> Decimal a r -> Arith p r (Decimal a r)
+          maybeRaise sig
+            | sig `signalMember` quantizeFlags =
+                fmap coerce . raiseSignal sig . coerce
+            | otherwise = return
+
+      in maybeRaise Inexact r >> maybeRaise Rounded r
+
+roundToIntegralExact x@Inf{} = return (coerce x)
+roundToIntegralExact x = coerce <$> generalRules1 x
+
+{- $doctest-roundToIntegralExact
+>>> op1 Op.roundToIntegralExact "2.1"
+2
+
+>>> op1 Op.roundToIntegralExact "100"
+100
+
+>>> op1 Op.roundToIntegralExact "100.0"
+100
+
+>>> op1 Op.roundToIntegralExact "101.5"
+102
+
+>>> op1 Op.roundToIntegralExact "-101.5"
+-102
+
+>>> op1 Op.roundToIntegralExact "10E+5"
+1.0E+6
+
+>>> op1 Op.roundToIntegralExact "7.89E+77"
+7.89E+77
+
+>>> op1 Op.roundToIntegralExact "-Inf"
+-Infinity
+-}
+
+-- | 'roundToIntegralValue' takes one operand. It is identical to the
+-- 'roundToIntegralExact' operation except that the 'Inexact' and 'Rounded'
+-- flags are never set even if the operand is rounded (that is, the operation
+-- is quiet unless the operand is a signaling NaN).
+roundToIntegralValue :: (Precision a, Rounding r)
+                     => Decimal a b -> Arith p r (Decimal a r)
+roundToIntegralValue x@Num { exponent = e }
+  | e >= 0    = return (coerce x)
+  | otherwise = subArith (quantize x one)
+roundToIntegralValue x@Inf{} = return (coerce x)
+roundToIntegralValue x = coerce <$> generalRules1 x
 
 -- | 'squareRoot' takes one operand. If the operand is a /special value/ then
 -- the general rules apply.
