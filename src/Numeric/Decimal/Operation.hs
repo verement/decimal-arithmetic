@@ -1384,7 +1384,7 @@ fromLogical Logical { bits = b, bitLength = l } =
 -- 1. The length of the result will be at most /precision/ digits (all of
 -- which will be either 0 or 1); operands are truncated on the left or padded
 -- with zeros on the left as necessary. The result of a logical operation is
--- never rounded and the only /flag/ that might be set is /invalid-operation/
+-- never rounded and the only /flag/ that might be set is 'InvalidOperation'
 -- (set if an operand is not a valid logical operand).
 
 -- | 'and' is a logical operation which takes two logical operands. The result
@@ -2107,7 +2107,7 @@ sameQuantum _      _      = return False
 -- with the shift being to the left if the second operand is positive or to
 -- the right otherwise. Digits shifted into the coefficient are zeros.
 --
--- The only /flag/ that might be set is /invalid-operation/ (set if the first
+-- The only /flag/ that might be set is 'InvalidOperation' (set if the first
 -- operand is an sNaN or the second is not valid).
 --
 -- The 'rotate' operation can be used to rotate rather than shift a
@@ -2166,7 +2166,7 @@ validShift _ _ = False
 -- operand has more than /precision/ digits, it is truncated on the left
 -- before use.
 --
--- The only /flag/ that might be set is /invalid-operation/ (set if the first
+-- The only /flag/ that might be set is 'InvalidOperation' (set if the first
 -- operand is an sNaN or the second is not valid).
 --
 -- The 'shift' operation can be used to shift rather than rotate a
