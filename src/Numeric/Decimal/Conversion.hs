@@ -295,22 +295,14 @@ toNumber = parseSign flipSign <*> parseNumericString
                         , exponent    = e - fromIntegral (length fracDigits)
                         }
 
-                digitsWithOptionalPoint = fractionalDigits <|> wholeDigits
-
-                fractionalDigits = do
-                  char '.'
-                  fracDigits <- many1 parseDigit
-                  return $ \e ->
-                    Num { sign        = Pos
-                        , coefficient = readDigits fracDigits
-                        , exponent    = e - fromIntegral (length fracDigits)
-                        }
-
-                wholeDigits = do
+                digitsWithOptionalPoint = do
+                  fractional <- option False (char '.' *> pure True)
                   digits <- many1 parseDigit
+                  let offset | fractional = fromIntegral (length digits)
+                             | otherwise  = 0
                   return $ \e -> Num { sign        = Pos
                                      , coefficient = readDigits digits
-                                     , exponent    = e
+                                     , exponent    = e - offset
                                      }
 
         parseExponentPart :: ReadP Exponent
