@@ -41,17 +41,21 @@ library
                        Numeric.Decimal.Arithmetic
                        Numeric.Decimal.Conversion
                        Numeric.Decimal.Operation
-  other-modules:       Numeric.Decimal.Exception
+  other-modules:       Numeric.Decimal.Encoding
+                       Numeric.Decimal.Exception
                        Numeric.Decimal.Number
                        Numeric.Decimal.Precision
                        Numeric.Decimal.Rounding
 
   build-depends:       base >= 4.8 && < 5
+                     , binary
+                     , binary-bits
                      , deepseq
                      , mtl
   default-language:    Haskell2010
   default-extensions:  Trustworthy
   other-extensions:    FlexibleInstances
+                       GeneralizedNewtypeDeriving
                        MultiParamTypeClasses
                        RoleAnnotations
 

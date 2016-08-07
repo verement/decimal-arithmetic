@@ -49,6 +49,11 @@ module Numeric.Decimal
        , ExtendedDecimal
        , GeneralDecimal
 
+         -- ** Decimal numbers with defined encodings
+       , Decimal32
+       , Decimal64
+       , Decimal128
+
          -- ** Precision types
        , module Numeric.Decimal.Precision
 
@@ -70,6 +75,7 @@ module Numeric.Decimal
        , fromOrdering
        ) where
 
+import Numeric.Decimal.Encoding
 import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
 import Numeric.Decimal.Rounding
