@@ -76,12 +76,23 @@ roundDecimal n@Num { sign = s, coefficient = c, exponent = e } = do
 
     Nothing -> return (coerce n)
 
-  where excessDigits :: Coefficient -> Int -> Maybe Int
-        excessDigits c p | d > p     = Just (d - p)
-                         | otherwise = Nothing
-          where d = numDigits c :: Int
+roundDecimal n
+  | isNaN n = do
+      prec <- getPrecision
+      let p = payload n
+      case excessDigits p =<< (pred <$> prec) of
+        Just _  -> return n { payload = 0 }
+        Nothing -> return (coerce n)
+  where isNaN QNaN{} = True
+        isNaN SNaN{} = True
+        isNaN _      = False
 
 roundDecimal n = return (coerce n)
+
+excessDigits :: Coefficient -> Int -> Maybe Int
+excessDigits c p | d > p     = Just (d - p)
+                 | otherwise = Nothing
+  where d = numDigits c :: Int
 
 -- Required algorithms...
 
