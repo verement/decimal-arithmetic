@@ -12,8 +12,7 @@ import Prelude hiding (exponent)
 import Data.Binary (Binary(get, put))
 import Data.Binary.Bits.Get (BitGet, getBool, getWord8, getWord16be, runBitGet)
 import Data.Binary.Bits.Put (BitPut, putBool, putWord8, putWord16be, runBitPut)
-import Data.Bits (Bits(bit, shiftL, shiftR, testBit, zeroBits), FiniteBits,
-                  (.&.), (.|.))
+import Data.Bits (Bits(bit, shiftL, shiftR, testBit), FiniteBits, (.&.), (.|.))
 import Data.Word (Word8, Word16)
 
 import Numeric.Decimal.Number
@@ -105,73 +104,53 @@ getDecimal128 = toDecimal128 <$> getDecimal 12 11 6176
 -- Densely Packed Decimal
 
 dpd2bcd :: Word16 -> (Word8, Word8, Word8)
-dpd2bcd dpd = (pack a b c d, pack e f g h, pack i j k m)
+dpd2bcd dpd = case mask 0 0xe of
+  0xe -> case mask 4 0x6 of
+    0x6 -> (    c7,     f4,     i0)
+    0x4 -> (a9b8c7,     f4,     i0)
+    0x2 -> (    c7, d9e8f4,     i0)
+    _   -> (    c7,     f4, g9h8i0)
+  0xc ->   (    c7, d6e5f4, g9h8i0)
+  0xa ->   (a9b8c7,     f4, g6h5i0)
+  0x8 ->   (a9b8c7, d6e5f4,     i0)
+  _   ->   (a9b8c7, d6e5f4, g2h1i0)
 
-  where p = testBit dpd 9
-        q = testBit dpd 8
-        r = testBit dpd 7
-        s = testBit dpd 6
-        t = testBit dpd 5
-        u = testBit dpd 4
-        v = testBit dpd 3
-        w = testBit dpd 2
-        x = testBit dpd 1
-        y = testBit dpd 0
+  where a9b8c7 =              mask 7 7
+        d6e5f4 =              mask 4 7
+        d9e8f4 = mask 7 6 .|. mask 4 1
+        g2h1i0 =              mask 0 7
+        g6h5i0 = mask 4 6 .|. mask 0 1
+        g9h8i0 = mask 7 6 .|. mask 0 1
+        i0     = 8        .|. mask 0 1
+        f4     = 8        .|. mask 4 1
+        c7     = 8        .|. mask 7 1
 
-        a = (v && w) && (not s || t || not x)
-        b = p && (not v || not w || (s && not t && x))
-        c = q && (not v || not w || (s && not t && x))
-        d = r
-        e = v && ((not w && x) || (not t && x) || (s && x))
-        f = (s && (not v || not x)) || (p && not s && t && v && w && x)
-        g = (t && (not v || not x)) || (q && not s && t && w)
-        h = u
-        i = v && ((not w && not x) || (w && x && (s || t)))
-        j = (not v && w) || (s && v && not w && x) ||
-            (p && w && (not x || (not s && not t)))
-        k = (not v && x) || (t && not w && x) ||
-            (q && v && w && (not x || (not s && not t)))
-        m = y
-
-        pack :: Bool -> Bool -> Bool -> Bool -> Word8
-        pack a b c d = boolBit a 3 .|. boolBit b 2 .|.
-                       boolBit c 1 .|. boolBit d 0
+        mask :: Int -> Word8 -> Word8
+        mask s m = fromIntegral (shiftR dpd s) .&. m
 
 bcd2dpd :: Word8 -> Word8 -> Word8 -> Word16
-bcd2dpd d1 d2 d3 =
-  boolBit p 9 .|. boolBit q 8 .|. boolBit r 7 .|.
-  boolBit s 6 .|. boolBit t 5 .|. boolBit u 4 .|. boolBit v 3 .|.
-  boolBit w 2 .|. boolBit x 1 .|. boolBit y 0
+bcd2dpd d2 d1 d0 = case (d2 < 8, d1 < 8, d0 < 8) of
+  (True , True , True ) ->      a9b8c7 .|.      d6e5f4          .|. g2h1i0
+  (True , True , False) ->      a9b8c7 .|.      d6e5f4 .|. 0x08 .|.     i0
+  (True , False, True ) ->      a9b8c7 .|. g6h5 .|. f4 .|. 0x0a .|.     i0
+  (False, True , True ) -> g9h8 .|. c7 .|.      d6e5f4 .|. 0x0c .|.     i0
+  (False, False, True ) -> g9h8 .|. c7 .|.          f4 .|. 0x0e .|.     i0
+  (False, True , False) -> d9e8 .|. c7 .|.          f4 .|. 0x2e .|.     i0
+  (True , False, False) ->      a9b8c7 .|.          f4 .|. 0x4e .|.     i0
+  (False, False, False) ->          c7 .|.          f4 .|. 0x6e .|.     i0
 
-  where a = testBit d1 3
-        b = testBit d1 2
-        c = testBit d1 1
-        d = testBit d1 0
+  where a9b8c7 = isolate d2 7 7
+        c7     = isolate d2 1 7
+        d6e5f4 = isolate d1 7 4
+        d9e8   = isolate d1 6 7
+        f4     = isolate d1 1 4
+        g2h1i0 = isolate d0 7 0
+        g6h5   = isolate d0 6 4
+        g9h8   = isolate d0 6 7
+        i0     = isolate d0 1 0
 
-        e = testBit d2 3
-        f = testBit d2 2
-        g = testBit d2 1
-        h = testBit d2 0
-
-        i = testBit d3 3
-        j = testBit d3 2
-        k = testBit d3 1
-        m = testBit d3 0
-
-        p = b || (a && j) || (a && f && i)
-        q = c || (a && k) || (a && g && i)
-        r = d
-        s = (f && (not a || not i)) || (not a && e && j) || (e && i)
-        t = g || (not a && e && k) || (a && i)
-        u = h
-        v = a || e || i
-        w = a || (e && i) || (not e && j)
-        x = e || (a && i) || (not a && k)
-        y = m
-
-boolBit :: Bits a => Bool -> Int -> a
-boolBit False _ = zeroBits
-boolBit True  i = bit i
+        isolate :: Word8 -> Word8 -> Int -> Word16
+        isolate d m = shiftL (fromIntegral $ d .&. m)
 
 -- Low-level functions
 
