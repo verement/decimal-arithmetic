@@ -49,10 +49,10 @@ module Numeric.Decimal
        , ExtendedDecimal
        , GeneralDecimal
 
-         -- ** Decimal numbers with defined encodings
-       , Decimal32
-       , Decimal64
-       , Decimal128
+         -- ** Number types with defined encodings
+       , Decimal32 , toDecimal32 , fromDecimal32
+       , Decimal64 , toDecimal64 , fromDecimal64
+       , Decimal128, toDecimal128, fromDecimal128
 
          -- ** Precision types
        , module Numeric.Decimal.Precision
@@ -91,10 +91,9 @@ rounds half up.
 * 'ExtendedDecimal' is a number type constructor with selectable precision
 that rounds half even. For example, @'ExtendedDecimal' 'P34'@ is a number type
 with 34 decimal digits of precision. There is a range of ready-made precisions
-available, including 'P1' through 'P50' on up to 'P2000' (the IEEE 754
-smallest and basic formats correspond to precisions 'P7', 'P16', or 'P34').
-Alternatively, an arbitrary precision can be constructed through type
-application of 'PPlus1' and/or 'PTimes2' to any existing precision.
+available, including 'P1' through 'P50' on up to 'P2000'. Alternatively, an
+arbitrary precision can be constructed through type application of 'PPlus1'
+and/or 'PTimes2' to any existing precision.
 
 * 'GeneralDecimal' is a number type with infinite precision. Note that not all
 operations support numbers with infinite precision.
@@ -103,6 +102,10 @@ operations support numbers with infinite precision.
 precision and a rounding algorithm. For example, @'Decimal' 'P20' 'RoundDown'@
 is a number type with 20 decimal digits of precision that rounds down
 (truncates). Several 'Rounding' algorithms are available to choose from.
+
+* 'Decimal32', 'Decimal64', and 'Decimal128' are specialized number types with
+'Data.Binary.Binary' instances that implement the /decimal32/, /decimal64/,
+and /decimal128/ interchange format encodings described in IEEE 754-2008.
 
 It is suggested to create an alias for the type of numbers you wish to support
 in your application. For example:

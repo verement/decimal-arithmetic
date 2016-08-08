@@ -2,34 +2,32 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Numeric.Decimal.Encoding (
-    Decimal32, toDecimal32, fromDecimal32
-  , Decimal64
-  , Decimal128
+    Decimal32 , toDecimal32 , fromDecimal32
+  , Decimal64 , toDecimal64 , fromDecimal64
+  , Decimal128, toDecimal128, fromDecimal128
   ) where
 
 import Prelude hiding (exponent)
 
-import Data.Binary (Binary(get, put), Put)
+import Data.Binary (Binary(get, put))
 import Data.Binary.Bits.Get (BitGet, getBool, getWord8, getWord16be, runBitGet)
+import Data.Binary.Bits.Put (BitPut, putBool, putWord8, putWord16be, runBitPut)
 import Data.Bits (Bits(bit, shiftL, shiftR, testBit, zeroBits), FiniteBits,
                   (.&.), (.|.))
+import Data.List (unfoldr)
 import Data.Word (Word8, Word16)
 
 import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
-import Numeric.Decimal.Rounding
 
 -- | A decimal floating point number with 7 digits of precision, rounding half
 -- even, having a 32-bit encoded representation
-newtype Decimal32 = Decimal32 (ExtendedDecimal P7)
+newtype Decimal32 = Decimal32 { fromDecimal32 :: ExtendedDecimal P7 }
                   deriving (Enum, Eq, Floating, Fractional, Num, Ord, Real,
                             RealFloat, RealFrac, Bits, FiniteBits, Precision)
 
-toDecimal32 :: Decimal p r -> Decimal32
-toDecimal32 = Decimal32 . cast
-
-fromDecimal32 :: (Precision p, Rounding r) => Decimal32 -> Decimal p r
-fromDecimal32 (Decimal32 x) = cast x
+toDecimal32 :: ExtendedDecimal P7 -> Decimal32
+toDecimal32 = Decimal32
 
 instance Show Decimal32 where
   showsPrec d (Decimal32 n) = showsPrec d n
@@ -37,15 +35,20 @@ instance Show Decimal32 where
 instance Read Decimal32 where
   readsPrec d str = [ (Decimal32 n, s) | (n, s) <- readsPrec d str ]
 
+-- | The 'Binary' instance implements the /decimal32/ interchange format
+-- described in IEEE 754-2008 using a /decimal/ encoding for the coefficient.
 instance Binary Decimal32 where
-  put = putDecimal32
-  get = runBitGet getDecimal32
+  put = runBitPut . putDecimal32
+  get = runBitGet   getDecimal32
 
 -- | A decimal floating point number with 16 digits of precision, rounding
 -- half even, having a 64-bit encoded representation
-newtype Decimal64 = Decimal64 (ExtendedDecimal P16)
+newtype Decimal64 = Decimal64 { fromDecimal64 :: ExtendedDecimal P16 }
                   deriving (Enum, Eq, Floating, Fractional, Num, Ord, Real,
                             RealFloat, RealFrac, Bits, FiniteBits, Precision)
+
+toDecimal64 :: ExtendedDecimal P16 -> Decimal64
+toDecimal64 = Decimal64
 
 instance Show Decimal64 where
   showsPrec d (Decimal64 n) = showsPrec d n
@@ -53,15 +56,20 @@ instance Show Decimal64 where
 instance Read Decimal64 where
   readsPrec d str = [ (Decimal64 n, s) | (n, s) <- readsPrec d str ]
 
+-- | The 'Binary' instance implements the /decimal64/ interchange format
+-- described in IEEE 754-2008 using a /decimal/ encoding for the coefficient.
 instance Binary Decimal64 where
-  put = putDecimal64
-  get = runBitGet getDecimal64
+  put = runBitPut . putDecimal64
+  get = runBitGet   getDecimal64
 
 -- | A decimal floating point number with 34 digits of precision, rounding
 -- half even, having a 128-bit encoded representation
-newtype Decimal128 = Decimal128 (ExtendedDecimal P34)
+newtype Decimal128 = Decimal128 { fromDecimal128 :: ExtendedDecimal P34 }
                    deriving (Enum, Eq, Floating, Fractional, Num, Ord, Real,
                              RealFloat, RealFrac, Bits, FiniteBits, Precision)
+
+toDecimal128 :: ExtendedDecimal P34 -> Decimal128
+toDecimal128 = Decimal128
 
 instance Show Decimal128 where
   showsPrec d (Decimal128 n) = showsPrec d n
@@ -69,51 +77,33 @@ instance Show Decimal128 where
 instance Read Decimal128 where
   readsPrec d str = [ (Decimal128 n, s) | (n, s) <- readsPrec d str ]
 
+-- | The 'Binary' instance implements the /decimal128/ interchange format
+-- described in IEEE 754-2008 using a /decimal/ encoding for the coefficient.
 instance Binary Decimal128 where
-  put = putDecimal128
-  get = runBitGet getDecimal128
+  put = runBitPut . putDecimal128
+  get = runBitGet   getDecimal128
 
 -- Encoding and decoding functions
 
-putDecimal32 :: Decimal32 -> Put
-putDecimal32 = undefined
+putDecimal32 :: Decimal32 -> BitPut ()
+putDecimal32 = putDecimal 6 2 101 . fromDecimal32
 
 getDecimal32 :: BitGet Decimal32
-getDecimal32 = Decimal32 <$> getDecimal 6 2 101
+getDecimal32 = toDecimal32 <$> getDecimal 6 2 101
 
-putDecimal64 :: Decimal64 -> Put
-putDecimal64 = undefined
+putDecimal64 :: Decimal64 -> BitPut ()
+putDecimal64 = putDecimal 8 5 398 . fromDecimal64
 
 getDecimal64 :: BitGet Decimal64
-getDecimal64 = Decimal64 <$> getDecimal 8 5 398
+getDecimal64 = toDecimal64 <$> getDecimal 8 5 398
 
-putDecimal128 :: Decimal128 -> Put
-putDecimal128 = undefined
+putDecimal128 :: Decimal128 -> BitPut ()
+putDecimal128 = putDecimal 12 11 6176 . fromDecimal128
 
 getDecimal128 :: BitGet Decimal128
-getDecimal128 = Decimal128 <$> getDecimal 12 11 6176
+getDecimal128 = toDecimal128 <$> getDecimal 12 11 6176
 
 -- Densely Packed Decimal
-
-type BCD = (Bool, Bool, Bool, Bool)
-
-type DPD = (Bool, Bool, Bool,
-            Bool, Bool, Bool, Bool,
-            Bool, Bool, Bool)
-
-bcd2dpd :: BCD -> BCD -> BCD -> DPD
-bcd2dpd (a, b, c, d) (e, f, g, h) (i, j, k, m) =
-  let p = b || (a && j) || (a && f && i)
-      q = c || (a && k) || (a && g && i)
-      r = d
-      s = (f && (not a || not i)) || (not a && e && j) || (e && i)
-      t = g || (not a && e && k) || (a && i)
-      u = h
-      v = a || e || i
-      w = a || (e && i) || (not e && j)
-      x = e || (a && i) || (not a && k)
-      y = m
-  in (p, q, r, s, t, u, v, w, x, y)
 
 dpd2bcd :: Word16 -> (Word8, Word8, Word8)
 dpd2bcd dpd = (pack a b c d, pack e f g h, pack i j k m)
@@ -150,19 +140,46 @@ dpd2bcd dpd = (pack a b c d, pack e f g h, pack i j k m)
                        (if c then bit 1 else zeroBits) .|.
                        (if d then bit 0 else zeroBits)
 
-digit2bcd :: Word8 -> BCD
-digit2bcd d = case d of
-  0 -> (False, False, False, False)
-  1 -> (False, False, False, True )
-  2 -> (False, False, True , False)
-  3 -> (False, False, True , True )
-  4 -> (False, True , False, False)
-  5 -> (False, True , False, True )
-  6 -> (False, True , True , False)
-  7 -> (False, True , True , True )
-  8 -> (True , False, False, False)
-  9 -> (True , False, False, True )
-  _ -> error "digit2bcd: invalid digit"
+bcd2dpd :: Word8 -> Word8 -> Word8 -> Word16
+bcd2dpd d1 d2 d3 =
+  (if p then bit 9 else zeroBits) .|.
+  (if q then bit 8 else zeroBits) .|.
+  (if r then bit 7 else zeroBits) .|.
+  (if s then bit 6 else zeroBits) .|.
+  (if t then bit 5 else zeroBits) .|.
+  (if u then bit 4 else zeroBits) .|.
+  (if v then bit 3 else zeroBits) .|.
+  (if w then bit 2 else zeroBits) .|.
+  (if x then bit 1 else zeroBits) .|.
+  (if y then bit 0 else zeroBits)
+
+  where a = testBit d1 3
+        b = testBit d1 2
+        c = testBit d1 1
+        d = testBit d1 0
+
+        e = testBit d2 3
+        f = testBit d2 2
+        g = testBit d2 1
+        h = testBit d2 0
+
+        i = testBit d3 3
+        j = testBit d3 2
+        k = testBit d3 1
+        m = testBit d3 0
+
+        p = b || (a && j) || (a && f && i)
+        q = c || (a && k) || (a && g && i)
+        r = d
+        s = (f && (not a || not i)) || (not a && e && j) || (e && i)
+        t = g || (not a && e && k) || (a && i)
+        u = h
+        v = a || e || i
+        w = a || (e && i) || (not e && j)
+        x = e || (a && i) || (not a && k)
+        y = m
+
+-- Low-level functions
 
 data CombinationField = Finite { exponentMSBs   :: Word8
                                , coefficientMSD :: Word8 }
@@ -185,8 +202,19 @@ getCommon = do
                          }
   return (sign, cf)
 
+putCommon :: Sign -> CombinationField -> BitPut ()
+putCommon sign cf = do
+  putBool (toEnum . fromEnum $ sign)
+  let bits = case cf of
+        Finite { exponentMSBs = msbs, coefficientMSD = msd }
+          | msd < 8   ->          shiftL msbs 3 .|.  msd
+          | otherwise -> 0x18 .|. shiftL msbs 1 .|. (msd .&. 0x01)
+        Infinity      -> 0x1e
+        NotANumber    -> 0x1f
+  putWord8 5 bits
+
 getCoefficient :: CombinationField -> Int -> BitGet Coefficient
-getCoefficient cf = getCoefficient' (getMSD cf)
+getCoefficient = getCoefficient' . getMSD
 
   where getCoefficient' :: Coefficient -> Int -> BitGet Coefficient
         getCoefficient' ic 0 = return ic
@@ -212,3 +240,39 @@ getDecimal ecbits cclen bias = do
     NotANumber ->
       let s = testBit ec (ecbits - 1)
       in NaN { sign = sign, signaling = s, payload = coefficient }
+
+putDecimal :: Int -> Int -> Exponent -> Decimal p r -> BitPut ()
+putDecimal ecbits cclen bias x = do
+  let msd : cc = digits x
+      (cf, ee) = case x of
+        Num { exponent = e } ->
+          let cf = Finite { exponentMSBs   = fromIntegral (shiftR ee ecbits)
+                          , coefficientMSD = msd
+                          }
+          in (cf, fromIntegral $ e + bias)
+        Inf{} -> (Infinity, 0)
+        NaN { signaling = s } -> (NotANumber, if s then bit (ecbits - 1) else 0)
+  putCommon (sign x) cf
+  putWord16be ecbits (ee .&. (bit ecbits - 1))
+  putDigits cc
+
+  where digits :: Decimal p r -> [Word8]
+        digits x = let ds = case x of
+                         Num { coefficient = c } -> digits' c
+                         NaN { payload     = p } -> digits' p
+                         Inf {                 } -> []
+                   in replicate (1 + cclen * 3 - length ds) 0 ++ ds
+
+        digits' :: Coefficient -> [Word8]
+        digits' = reverse . unfoldr getDigit
+          where getDigit :: Coefficient -> Maybe (Word8, Coefficient)
+                getDigit 0 = Nothing
+                getDigit c = let (q, r) = c `quotRem` 10
+                             in Just (fromIntegral r, q)
+
+        putDigits :: [Word8] -> BitPut ()
+        putDigits (a : b : c : rest) = do
+          putWord16be 10 (bcd2dpd a b c)
+          putDigits rest
+        putDigits [] = return ()
+        putDigits _ = error "putDigits: invalid # digits"
