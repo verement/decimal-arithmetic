@@ -134,23 +134,14 @@ dpd2bcd dpd = (pack a b c d, pack e f g h, pack i j k m)
         m = y
 
         pack :: Bool -> Bool -> Bool -> Bool -> Word8
-        pack a b c d = (if a then bit 3 else zeroBits) .|.
-                       (if b then bit 2 else zeroBits) .|.
-                       (if c then bit 1 else zeroBits) .|.
-                       (if d then bit 0 else zeroBits)
+        pack a b c d = boolBit a 3 .|. boolBit b 2 .|.
+                       boolBit c 1 .|. boolBit d 0
 
 bcd2dpd :: Word8 -> Word8 -> Word8 -> Word16
 bcd2dpd d1 d2 d3 =
-  (if p then bit 9 else zeroBits) .|.
-  (if q then bit 8 else zeroBits) .|.
-  (if r then bit 7 else zeroBits) .|.
-  (if s then bit 6 else zeroBits) .|.
-  (if t then bit 5 else zeroBits) .|.
-  (if u then bit 4 else zeroBits) .|.
-  (if v then bit 3 else zeroBits) .|.
-  (if w then bit 2 else zeroBits) .|.
-  (if x then bit 1 else zeroBits) .|.
-  (if y then bit 0 else zeroBits)
+  boolBit p 9 .|. boolBit q 8 .|. boolBit r 7 .|.
+  boolBit s 6 .|. boolBit t 5 .|. boolBit u 4 .|. boolBit v 3 .|.
+  boolBit w 2 .|. boolBit x 1 .|. boolBit y 0
 
   where a = testBit d1 3
         b = testBit d1 2
@@ -177,6 +168,10 @@ bcd2dpd d1 d2 d3 =
         w = a || (e && i) || (not e && j)
         x = e || (a && i) || (not a && k)
         y = m
+
+boolBit :: Bits a => Bool -> Int -> a
+boolBit False _ = zeroBits
+boolBit True  i = bit i
 
 -- Low-level functions
 
