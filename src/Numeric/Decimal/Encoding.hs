@@ -14,7 +14,6 @@ import Data.Binary.Bits.Get (BitGet, getBool, getWord8, getWord16be, runBitGet)
 import Data.Binary.Bits.Put (BitPut, putBool, putWord8, putWord16be, runBitPut)
 import Data.Bits (Bits(bit, shiftL, shiftR, testBit, zeroBits), FiniteBits,
                   (.&.), (.|.))
-import Data.List (unfoldr)
 import Data.Word (Word8, Word16)
 
 import Numeric.Decimal.Number
@@ -264,11 +263,10 @@ putDecimal ecbits cclen bias x = do
                    in replicate (1 + cclen * 3 - length ds) 0 ++ ds
 
         digits' :: Coefficient -> [Word8]
-        digits' = reverse . unfoldr getDigit
-          where getDigit :: Coefficient -> Maybe (Word8, Coefficient)
-                getDigit 0 = Nothing
-                getDigit c = let (q, r) = c `quotRem` 10
-                             in Just (fromIntegral r, q)
+        digits' = go []
+          where go ds 0 = ds
+                go ds c = let (q, r) = c `quotRem` 10
+                          in go (fromIntegral r : ds) q
 
         putDigits :: [Word8] -> BitPut ()
         putDigits (a : b : c : rest) = do
