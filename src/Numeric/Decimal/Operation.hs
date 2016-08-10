@@ -87,7 +87,7 @@ module Numeric.Decimal.Operation
        , compareTotal
        , compareTotalMagnitude
 
-       , class_, Class(..), Sign(..), NumberClass(..), NaNClass(..)
+       , class', Class(..), Sign(..), NumberClass(..), NaNClass(..)
 
          -- ** Exponent manipulation
        , logb
@@ -1533,7 +1533,7 @@ canonical = copy
 2.50
 -}
 
--- | 'class_' takes one operand. The result is an indication of the /class/ of
+-- | 'class'' takes one operand. The result is an indication of the /class/ of
 -- the operand, where the class is one of ten possibilities, corresponding to
 -- one of the strings @"sNaN"@ (signaling NaN), @\"NaN"@ (quiet NaN),
 -- @"-Infinity"@ (negative infinity), @"-Normal"@ (negative normal finite
@@ -1545,8 +1545,8 @@ canonical = copy
 --
 -- Note that unlike the special values in the model, the sign of any NaN is
 -- ignored in the classification, as required by IEEE 754.
-class_ :: Precision a => Decimal a b -> Arith p r Class
-class_ n = return $ case n of
+class' :: Precision a => Decimal a b -> Arith p r Class
+class' n = return $ case n of
   Num {} | Number.isZero n      -> NumberClass (sign n) ZeroClass
          | Number.isSubnormal n -> NumberClass (sign n) SubnormalClass
          | otherwise            -> NumberClass (sign n) NormalClass
@@ -1588,44 +1588,44 @@ instance Show Class where
           nan :: String
           nan = "NaN"
 
-{- $doctest-class_
->>> op1 Op.class_ "Infinity"
+{- $doctest-class'
+>>> op1 Op.class' "Infinity"
 +Infinity
 
->>> op1 Op.class_ "1E-10"
+>>> op1 Op.class' "1E-10"
 +Normal
 
->>> op1 Op.class_ "2.50"
+>>> op1 Op.class' "2.50"
 +Normal
 
->>> op1 Op.class_ "0.1E-999"
+>>> op1 Op.class' "0.1E-999"
 +Subnormal
 
->>> op1 Op.class_ "0"
+>>> op1 Op.class' "0"
 +Zero
 
->>> op1 Op.class_ "-0"
+>>> op1 Op.class' "-0"
 -Zero
 
->>> op1 Op.class_ "-0.1E-999"
+>>> op1 Op.class' "-0.1E-999"
 -Subnormal
 
->>> op1 Op.class_ "-1E-10"
+>>> op1 Op.class' "-1E-10"
 -Normal
 
->>> op1 Op.class_ "-2.50"
+>>> op1 Op.class' "-2.50"
 -Normal
 
->>> op1 Op.class_ "-Infinity"
+>>> op1 Op.class' "-Infinity"
 -Infinity
 
->>> op1 Op.class_ "NaN"
+>>> op1 Op.class' "NaN"
 NaN
 
->>> op1 Op.class_ "-NaN"
+>>> op1 Op.class' "-NaN"
 NaN
 
->>> op1 Op.class_ "sNaN"
+>>> op1 Op.class' "sNaN"
 sNaN
 -}
 
