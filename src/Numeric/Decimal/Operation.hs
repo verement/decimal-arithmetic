@@ -141,15 +141,15 @@ result = roundDecimal  -- ...
 --  | maybe False (numDigits c >) (precision r) = undefined
 
 generalRules1 :: Decimal a b -> Arith p r (Decimal p r)
-generalRules1 nan@QNaN{} = return (coerce nan)
-generalRules1 x          = invalidOperation x
+generalRules1 nan@NaN { signaling = False } = return (coerce nan)
+generalRules1 x                             = invalidOperation x
 
 generalRules2 :: Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-generalRules2 nan@SNaN{} _          = invalidOperation nan
-generalRules2 _          nan@SNaN{} = invalidOperation nan
-generalRules2 nan@QNaN{} _          = return (coerce nan)
-generalRules2 _          nan@QNaN{} = return (coerce nan)
-generalRules2 x          _          = invalidOperation x
+generalRules2 nan@NaN { signaling = True } _ = invalidOperation nan
+generalRules2 _ nan@NaN { signaling = True } = invalidOperation nan
+generalRules2 nan@NaN{} _                    = return (coerce nan)
+generalRules2 _         nan@NaN{}            = return (coerce nan)
+generalRules2 x         _                    = invalidOperation x
 
 -- $arithmetic-operations
 --
@@ -815,14 +815,13 @@ compare x y = Left <$> generalRules2 x y
 -- NaNs taking precedence over quiet NaNs.)
 compareSignal :: Decimal a b -> Decimal c d
               -> Arith p r (Either (Decimal p r) Ordering)
-compareSignal x@SNaN{} y        =               x `compare`               y
-compareSignal x        y@SNaN{} =               x `compare`               y
-compareSignal x        y        = quietToSignal x `compare` quietToSignal y
+compareSignal x@NaN { signaling = True } y =     x `compare`     y
+compareSignal x y@NaN { signaling = True } =     x `compare`     y
+compareSignal x y                          = q2s x `compare` q2s y
 
-  where quietToSignal :: Decimal p r -> Decimal p r
-        quietToSignal QNaN { sign = s, payload = p } =
-                      SNaN { sign = s, payload = p }
-        quietToSignal x = x
+  where q2s :: Decimal p r -> Decimal p r
+        q2s nan@NaN{} = nan { signaling = True }
+        q2s x         = x
 
 -- | 'max' takes two operands, compares their values numerically, and returns
 -- the maximum. If either operand is a NaN then the general rules apply,
@@ -891,10 +890,10 @@ minMagnitude x y = fst <$> minMax withoutSign x y
 -- is applied to them.
 minMax :: (Decimal a b -> Decimal a b) -> Decimal a b -> Decimal a b
        -> Arith p r (Decimal a b, Decimal a b)
-minMax _ x@Num{}  QNaN{} = return (x, x)
-minMax _ x@Inf{}  QNaN{} = return (x, x)
-minMax _  QNaN{} y@Num{} = return (y, y)
-minMax _  QNaN{} y@Inf{} = return (y, y)
+minMax _ x@Num{}                       NaN { signaling = False } = return (x, x)
+minMax _ x@Inf{}                       NaN { signaling = False } = return (x, x)
+minMax _   NaN { signaling = False } y@Num{}                     = return (y, y)
+minMax _   NaN { signaling = False } y@Inf{}                     = return (y, y)
 
 minMax f x y = f x `compare` f y >>= \c -> return $ case c of
   Right LT -> (x, y)
@@ -1551,8 +1550,7 @@ class' n = return $ case n of
          | Number.isSubnormal n -> NumberClass (sign n) SubnormalClass
          | otherwise            -> NumberClass (sign n) NormalClass
   Inf {}                        -> NumberClass (sign n) InfinityClass
-  QNaN{}                        -> NaNClass QuietClass
-  SNaN{}                        -> NaNClass SignalingClass
+  NaN { signaling = s }         -> NaNClass (toEnum . fromEnum $ s)
 
 data Class = NumberClass Sign NumberClass -- ^ Number (finite or infinite)
            | NaNClass NaNClass            -- ^ Not a number (quiet or signaling)
@@ -1566,7 +1564,7 @@ data NumberClass = ZeroClass       -- ^ Zero
 
 data NaNClass = QuietClass      -- ^ Quiet NaN
               | SignalingClass  -- ^ Signaling NaN
-              deriving Eq
+              deriving (Eq, Enum)
 
 instance Show Class where
   show c = case c of
@@ -1671,15 +1669,14 @@ compareTotal x y = return $ case (sign x, sign y) of
                          | otherwise = (xc, yc * 10^n)
               n = Prelude.abs (xe - ye)
           in Prelude.compare xac yac `mappend` Prelude.compare xe ye
-        compareAbs   Num{}    Inf{}  = LT
-        compareAbs   Inf{}    Num{}  = GT
-        compareAbs   Inf{}    Inf{}  = EQ
-        compareAbs x@QNaN{} y@QNaN{} = Prelude.compare (payload x) (payload y)
-        compareAbs   QNaN{}   _      = GT
-        compareAbs   _        QNaN{} = LT
-        compareAbs x@SNaN{} y@SNaN{} = Prelude.compare (payload x) (payload y)
-        compareAbs   SNaN{}   _      = GT
-        compareAbs   _        SNaN{} = LT
+        compareAbs Num{} Inf{} = LT
+        compareAbs Inf{} Num{} = GT
+        compareAbs Inf{} Inf{} = EQ
+        compareAbs NaN { signaling = xs, payload = xp }
+                   NaN { signaling = ys, payload = yp } =
+          Prelude.compare ys xs `mappend` Prelude.compare xp yp
+        compareAbs NaN{} _     = GT
+        compareAbs _     NaN{} = LT
 
 {- $doctest-compareTotal
 >>> fromOrdering $ op2 Op.compareTotal "12.73" "127.9"
@@ -1839,9 +1836,8 @@ isInfinite n = return $ case n of
 -- by context and is quiet — no /flags/ are changed in the context.
 isNaN :: Decimal a b -> Arith p r Bool
 isNaN n = return $ case n of
-  QNaN{} -> True
-  SNaN{} -> True
-  _      -> False
+  NaN{} -> True
+  _     -> False
 
 {- $doctest-isNaN
 >>> fromBool $ op1 Op.isNaN "2.50"
@@ -1882,8 +1878,8 @@ isNormal = return . Number.isNormal
 -- and is quiet — no /flags/ are changed in the context.
 isQNaN :: Decimal a b -> Arith p r Bool
 isQNaN n = return $ case n of
-  QNaN{} -> True
-  _      -> False
+  NaN { signaling = False } -> True
+  _                         -> False
 
 {- $doctest-isQNaN
 >>> fromBool $ op1 Op.isQNaN "2.50"
@@ -1918,8 +1914,8 @@ isSigned = return . Number.isNegative
 -- context and is quiet — no /flags/ are changed in the context.
 isSNaN :: Decimal a b -> Arith p r Bool
 isSNaN n = return $ case n of
-  SNaN{} -> True
-  _      -> False
+  NaN { signaling = True } -> True
+  _                        -> False
 
 {- $doctest-isSNaN
 >>> fromBool $ op1 Op.isSNaN "2.50"
@@ -2060,15 +2056,10 @@ radix = return radix'
 --
 -- 'sameQuantum' does not change any /flags/ in the context.
 sameQuantum :: Decimal a b -> Decimal c d -> Arith p r Bool
-sameQuantum Num { exponent = e1 } Num { exponent = e2 }
-  | e1 == e2  = return True
-  | otherwise = return False
-sameQuantum Inf {} Inf {} = return True
-sameQuantum QNaN{} QNaN{} = return True
-sameQuantum SNaN{} SNaN{} = return True
-sameQuantum QNaN{} SNaN{} = return True
-sameQuantum SNaN{} QNaN{} = return True
-sameQuantum _      _      = return False
+sameQuantum Num { exponent = xe } Num { exponent = ye } = return (xe == ye)
+sameQuantum Inf {               } Inf {               } = return True
+sameQuantum NaN {               } NaN {               } = return True
+sameQuantum _                     _                     = return False
 
 {- $doctest-sameQuantum
 >>> fromBool $ op2 Op.sameQuantum "2.17" "0.001"
@@ -2116,10 +2107,13 @@ shift n@Num { coefficient = c } s@Num { sign = d, coefficient = sc }
         y = case d of
           Pos -> n { coefficient =  c  *     10 ^ sc }
           Neg -> n { coefficient =  c `quot` 10 ^ sc }
-shift n@Inf{}  s | validShift z s = return z where z = coerce n
-shift n@QNaN{} s | validShift z s = return z where z = coerce n
-shift n@SNaN{} _                  = invalidOperation n
-shift _        s                  = invalidOperation s
+
+shift n@Inf {                   } s | validShift z s = return z
+  where z = coerce n
+shift n@NaN { signaling = False } s | validShift z s = return z
+  where z = coerce n
+shift n@NaN { signaling = True  } _                  = invalidOperation n
+shift _                           s                  = invalidOperation s
 
 validShift :: Precision p => p -> Decimal a b -> Bool
 validShift px Num { coefficient = c, exponent = 0 } =
@@ -2177,10 +2171,13 @@ rotate n@Num { coefficient = c } s@Num { sign = d, coefficient = sc }
           Neg -> (10^sc', 10^sc )
         Just p = precision z
         sc'    = p - fromIntegral sc
-rotate n@Inf{}  s | validShift z s = return z where z = coerce n
-rotate n@QNaN{} s | validShift z s = return z where z = coerce n
-rotate n@SNaN{} _                  = invalidOperation n
-rotate _        s                  = invalidOperation s
+
+rotate n@Inf {                   } s | validShift z s = return z
+  where z = coerce n
+rotate n@NaN { signaling = False } s | validShift z s = return z
+  where z = coerce n
+rotate n@NaN { signaling = True  } _                  = invalidOperation n
+rotate _                           s                  = invalidOperation s
 
 {- $doctest-rotate
 >>> op2 Op.rotate "34" "8"

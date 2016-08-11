@@ -95,18 +95,16 @@ type Payload     = Coefficient
 -- | A decimal floating point number with selectable precision and rounding
 -- algorithm
 data Decimal p r
-  = Num  { sign        :: Sign
-         , coefficient :: Coefficient
-         , exponent    :: Exponent
-         }
-  | Inf  { sign        :: Sign
-         }
-  | QNaN { sign        :: Sign
-         , payload     :: Payload
-         }
-  | SNaN { sign        :: Sign
-         , payload     :: Payload
-         }
+  = Num { sign        :: Sign
+        , coefficient :: Coefficient
+        , exponent    :: Exponent
+        }
+  | Inf { sign        :: Sign
+        }
+  | NaN { sign        :: Sign
+        , signaling   :: Bool
+        , payload     :: Payload
+        }
 
 -- | A decimal floating point number with 9 digits of precision, rounding half
 -- up
@@ -383,12 +381,12 @@ instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
   floatRange  _ = (minBound, maxBound)  -- ?
 
   decodeFloat x = case x of
-    Num  { sign = s, coefficient = c, exponent = e } -> (m, n)
+    Num { sign = s, coefficient = c, exponent = e } -> (m, n)
       where m = signFunc s (fromIntegral c)
             n = fromIntegral e
-    Inf  { sign = s              } -> (special s 0, maxBound    )
-    QNaN { sign = s, payload = p } -> (special s p, minBound    )
-    SNaN { sign = s, payload = p } -> (special s p, minBound + 1)
+    Inf { sign = s                                } -> (special s 0, maxBound)
+    NaN { sign = s, signaling = sig, payload = p  } -> (special s p, n)
+      where n = minBound + fromEnum sig
     where special :: Sign -> Coefficient -> Integer
           special s v = signFunc s (pp + fromIntegral v)
           pp = 10 ^ floatDigits x :: Integer
@@ -401,16 +399,15 @@ instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
                                    }
           special
             | n == maxBound     = Inf  { sign = signMatch m }
-            | n == minBound     = QNaN { sign = signMatch m, payload = p }
-            | otherwise         = SNaN { sign = signMatch m, payload = p }
+            | n == minBound     = qNaN { sign = signMatch m, payload = p }
+            | otherwise         = sNaN { sign = signMatch m, payload = p }
             where p = fromInteger (am - pp)
           am = abs m              :: Integer
           pp = 10 ^ floatDigits x :: Integer
 
   isNaN x = case x of
-    QNaN{} -> True
-    SNaN{} -> True
-    _      -> False
+    NaN{} -> True
+    _     -> False
 
   isInfinite x = case x of
     Inf{} -> True
@@ -510,11 +507,11 @@ infinity = Inf { sign = Pos }
 
 -- | A 'Decimal' representing undefined results
 qNaN :: Decimal p r
-qNaN = QNaN { sign = Pos, payload = 0 }
+qNaN = NaN { sign = Pos, signaling = False, payload = 0 }
 
 -- | A signaling 'Decimal' representing undefined results
 sNaN :: Decimal p r
-sNaN = SNaN { sign = Pos, payload = 0 }
+sNaN = qNaN { signaling = True }
 
 -- | Negate the given 'Decimal' by directly flipping its sign.
 flipSign :: Decimal p r -> Decimal p r

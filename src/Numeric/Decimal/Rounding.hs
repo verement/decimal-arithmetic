@@ -76,16 +76,11 @@ roundDecimal n@Num { sign = s, coefficient = c, exponent = e } = do
 
     Nothing -> return (coerce n)
 
-roundDecimal n
-  | isNaN n = do
-      prec <- getPrecision
-      let p = payload n
-      case excessDigits p =<< (pred <$> prec) of
-        Just _  -> return n { payload = 0 }
-        Nothing -> return (coerce n)
-  where isNaN QNaN{} = True
-        isNaN SNaN{} = True
-        isNaN _      = False
+roundDecimal n@NaN { payload = p } = do
+  prec <- getPrecision
+  case excessDigits p =<< (pred <$> prec) of
+    Just _  -> return n { payload = 0 }
+    Nothing -> return (coerce n)
 
 roundDecimal n = return (coerce n)
 

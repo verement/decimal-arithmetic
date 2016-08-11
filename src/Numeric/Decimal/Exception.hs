@@ -137,8 +137,8 @@ invalidContext = raiseSignal InvalidOperation qNaN
 -- copied from the signaling NaN.
 invalidOperation :: Decimal a b -> Arith p r (Decimal p r)
 invalidOperation n = raiseSignal InvalidOperation $ case n of
-  SNaN { sign = s, payload = p } -> qNaN { sign = s, payload = p }
-  _                              -> qNaN
+  NaN { signaling = True } -> n { signaling = False }
+  _                        -> qNaN
 
 -- | This occurs and signals 'Overflow' if the /adjusted exponent/ of a result
 -- (from a conversion or from an operation that is not an attempt to divide by

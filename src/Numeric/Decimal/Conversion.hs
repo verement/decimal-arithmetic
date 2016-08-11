@@ -244,14 +244,17 @@ showNumber exponential num = signStr . case num of
               showString (replicate (fromIntegral $ -e - cl) '0') .
               showString cs
 
-  Inf  {             } -> showString "Infinity"
-  QNaN { payload = p } -> showString  "NaN" . diag p
-  SNaN { payload = p } -> showString "sNaN" . diag p
+  Inf {                            } -> showString "Infinity"
+  NaN { signaling = s, payload = p } -> sig s . showString  "NaN" . diag p
 
   where signStr :: ShowS
         signStr = case sign num of
           Pos -> id
           Neg -> showChar '-'
+
+        sig :: Bool -> ShowS
+        sig False = id
+        sig True  = showChar 's'
 
         diag :: Payload -> ShowS
         diag 0 = id
@@ -322,13 +325,13 @@ toNumber = parseSign flipSign <*> parseNumericString
         parseQNaN :: ReadP (Decimal p r)
         parseQNaN = do
           p <- parseNaNPayload
-          return QNaN { sign = Pos, payload = p }
+          return qNaN { payload = p }
 
         parseSNaN :: ReadP (Decimal p r)
         parseSNaN = do
           parseString "s"
           p <- parseNaNPayload
-          return SNaN { sign = Pos, payload = p }
+          return sNaN { payload = p }
 
         parseNaNPayload :: ReadP Payload
         parseNaNPayload = do

@@ -23,17 +23,17 @@ data Rep = N (Int, Coefficient, Exponent)
 
 toRep :: GeneralDecimal -> Rep
 toRep n = case n of
-  Num  { sign = s, coefficient = c, exponent = e } -> N (fromEnum s, c, e)
-  Inf  { sign = s }                                -> I (fromEnum s)
-  QNaN { sign = s, payload = p }                   -> Q (fromEnum s, p)
-  SNaN { sign = s, payload = p }                   -> S (fromEnum s, p)
+  Num { sign = s, coefficient = c, exponent = e }  -> N (fromEnum s, c, e)
+  Inf { sign = s }                                 -> I (fromEnum s)
+  NaN { sign = s, signaling = False, payload = p } -> Q (fromEnum s, p)
+  NaN { sign = s, signaling = True , payload = p } -> S (fromEnum s, p)
 
 fromRep :: Rep -> GeneralDecimal
 fromRep r = case r of
-  N (s, c, e) -> Num  { sign = toEnum s, coefficient = c, exponent = e }
-  I s         -> Inf  { sign = toEnum s }
-  Q (s, p)    -> QNaN { sign = toEnum s, payload = p }
-  S (s, p)    -> SNaN { sign = toEnum s, payload = p }
+  N (s, c, e) -> Num { sign = toEnum s, coefficient = c, exponent = e }
+  I s         -> Inf { sign = toEnum s }
+  Q (s, p)    -> NaN { sign = toEnum s, signaling = False, payload = p }
+  S (s, p)    -> NaN { sign = toEnum s, signaling = True , payload = p }
 
 show' :: (GeneralDecimal -> ShowS) -> GeneralDecimal -> String
 show' s = ($ "") . s

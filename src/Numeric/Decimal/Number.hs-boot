@@ -22,18 +22,16 @@ type Payload     = Coefficient
 
 type role Decimal phantom phantom
 data Decimal p r
-  = Num  { sign        :: Sign
-         , coefficient :: Coefficient
-         , exponent    :: Exponent
-         }
-  | Inf  { sign        :: Sign
-         }
-  | QNaN { sign        :: Sign
-         , payload     :: Payload
-         }
-  | SNaN { sign        :: Sign
-         , payload     :: Payload
-         }
+  = Num { sign        :: Sign
+        , coefficient :: Coefficient
+        , exponent    :: Exponent
+        }
+  | Inf { sign        :: Sign
+        }
+  | NaN { sign        :: Sign
+        , signaling   :: Bool
+        , payload     :: Payload
+        }
 
 instance Precision p => Precision (Decimal p r)
 
