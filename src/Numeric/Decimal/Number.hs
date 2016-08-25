@@ -44,6 +44,7 @@ module Numeric.Decimal.Number
 
 import Prelude hiding (exponent)
 
+import Control.DeepSeq (NFData(..))
 import Control.Monad (join)
 import Data.Bits (Bits(..), FiniteBits(..))
 import Data.Char (isSpace)
@@ -68,6 +69,9 @@ import qualified GHC.Real
 data Sign = Pos  -- ^ Positive or non-negative
           | Neg  -- ^ Negative
           deriving (Eq, Enum)
+
+instance NFData Sign where
+  rnf s = s `seq` ()
 
 negateSign :: Sign -> Sign
 negateSign Pos = Neg
@@ -473,6 +477,13 @@ instance FinitePrecision p => Bits (Decimal p r) where
 
 instance FinitePrecision p => FiniteBits (Decimal p r) where
   finiteBitSize x = let Just p = precision x in p
+
+instance NFData (Decimal p r) where
+  rnf Num { sign = s, coefficient = c, exponent = e } =
+    rnf s `seq` rnf c `seq` rnf e
+  rnf Inf { sign = s } = rnf s
+  rnf NaN { sign = s, signaling = sig, payload = p } =
+    rnf s `seq` rnf sig `seq` rnf p
 
 -- | A 'Decimal' representing the value zero
 zero :: Decimal p r
