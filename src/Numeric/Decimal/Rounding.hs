@@ -56,7 +56,7 @@ getRounder = ($ undefined) <$> getRounder'
         getRounder' = return roundCoefficient
 
 -- | Round a 'Decimal' to the precision of the arithmetic context using the
--- rounding algorithm of the arithmetic context.
+-- rounding mode of the arithmetic context.
 roundDecimal :: (Precision p, Rounding r)
              => Decimal a b -> Arith p r (Decimal p r)
 roundDecimal n@Num { sign = s, coefficient = c, exponent = e } = do

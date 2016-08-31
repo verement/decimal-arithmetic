@@ -71,8 +71,8 @@ import Numeric.Decimal.Rounding
 -- arithmetic computation and manipulate its 'Context'.
 
 -- | A context for decimal arithmetic, carrying signal flags, trap enabler
--- state, and a trap handler, parameterized by precision @p@ and rounding
--- algorithm @r@
+-- state, and a trap handler, parameterized by precision @p@ and rounding mode
+-- @r@
 data Context p r =
   Context { flags        :: Signals
                             -- ^ The current signal flags of the context
@@ -122,7 +122,7 @@ data Exception p r =
   deriving Show
 
 -- | A decimal arithmetic monad parameterized by the precision @p@ and
--- rounding algorithm @r@
+-- rounding mode @r@
 newtype Arith p r a = Arith (ExceptT (Exception p r)
                              (State (Context p r)) a)
 
@@ -163,8 +163,8 @@ evalArith :: Arith p r a -> Context p r -> Either (Exception p r) a
 evalArith (Arith e) = evalState (runExceptT e)
 
 -- | Perform a subcomputation using a different precision and/or rounding
--- algorithm. The subcomputation is evaluated within a new context with all
--- flags cleared and all traps disabled. Any flags set in the context of the
+-- mode. The subcomputation is evaluated within a new context with all flags
+-- cleared and all traps disabled. Any flags set in the context of the
 -- subcomputation are ignored, but if an exception is returned it will be
 -- re-raised within the current context.
 subArith :: Arith a b (Decimal a b) -> Arith p r (Decimal a b)
@@ -180,7 +180,7 @@ getPrecision = getPrecision' undefined
   where getPrecision' :: Precision p => p -> Arith p r (Maybe Int)
         getPrecision' = return . precision
 
--- | Return the rounding algorithm of the arithmetic context.
+-- | Return the rounding mode of the arithmetic context.
 getRounding :: Rounding r => Arith p r RoundingAlgorithm
 getRounding = getRounding' undefined
   where getRounding' :: Rounding r => r -> Arith p r RoundingAlgorithm
