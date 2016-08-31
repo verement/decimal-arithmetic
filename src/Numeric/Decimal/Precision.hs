@@ -21,7 +21,8 @@ import {-# SOURCE #-} Numeric.Decimal.Number
 -- | Precision indicates the maximum number of significant decimal digits a
 -- number may have.
 class Precision p where
-  -- | Return the precision of the argument, or 'Nothing' if the precision is infinite.
+  -- | Return the precision of the argument, or 'Nothing' if the precision is
+  -- infinite.
   precision :: p -> Maybe Int
 
   -- | Return the maximum exponent for a number in scientific notation with

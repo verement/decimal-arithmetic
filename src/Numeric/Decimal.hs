@@ -110,11 +110,9 @@ rounding to use in your application. There are several options:
 rounds half up.
 
 * 'ExtendedDecimal' is a number type constructor with selectable precision
-that rounds half even. For example, @'ExtendedDecimal' 'P34'@ is a number type
-with 34 decimal digits of precision. There is a range of ready-made precisions
-available, including 'P1' through 'P50' on up to 'P2000'. Alternatively, an
-arbitrary precision can be constructed through type application of 'PPlus1'
-and/or 'PTimes2' to any existing precision.
+that rounds half even. For example, @'ExtendedDecimal' 'P15'@ is a number type
+with 15 decimal digits of precision. There is a range of ready-made precisions
+available, including 'P1' through 'P50' on up to 'P2000'.
 
 * 'GeneralDecimal' is a number type with infinite precision. Note that not all
 operations support numbers with infinite precision.
@@ -141,6 +139,9 @@ Additional operations and control beyond what is provided by the standard type
 classes are available through the use of "Numeric.Decimal.Arithmetic" and
 "Numeric.Decimal.Operation". Advanced string conversion is also available
 through "Numeric.Decimal.Conversion".
+
+Arbitrary precisions can be constructed through type application of 'PPlus1'
+and/or 'PTimes2' to any existing precision.
 
 It is possible to create arbitrary width interchange format encodings with the
 help of "Numeric.Decimal.Encoding".
