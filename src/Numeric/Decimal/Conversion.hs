@@ -24,7 +24,7 @@ import Control.Applicative ((<|>))
 import Data.Char (isDigit, digitToInt, toLower, toUpper)
 import Data.List (foldl')
 import Text.ParserCombinators.ReadP (ReadP, char, many, many1, option, optional,
-                                     pfail, satisfy)
+                                     satisfy)
 
 import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
@@ -311,7 +311,7 @@ toNumber = parseSign flipSign <*> parseNumericString
         parseExponentPart :: ReadP Exponent
         parseExponentPart = do
           parseString "E"
-          parseSign negate <*> (toExponent . readDigits =<< many1 parseDigit)
+          parseSign negate <*> (fromIntegral . readDigits <$> many1 parseDigit)
 
         parseInfinity :: ReadP (Decimal p r)
         parseInfinity = do
@@ -346,11 +346,6 @@ toNumber = parseSign flipSign <*> parseNumericString
 
         readDigits :: [Int] -> Coefficient
         readDigits = foldl' (\a b -> a * 10 + fromIntegral b) 0
-
-        toExponent :: Coefficient -> ReadP Exponent
-        toExponent x
-          | x <= fromIntegral (maxBound :: Exponent) = return (fromIntegral x)
-          | otherwise                                = pfail
 
 {- $doctest-toNumber
 

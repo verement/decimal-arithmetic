@@ -38,6 +38,9 @@ Decimal numbers support lossless conversion to and from a string
 representation via 'Show' and 'Read' instances. Note that there may be
 multiple representations of values that are numerically equal (e.g. 1 and
 1.00) which are preserved by this conversion.
+
+Some decimal numbers also support encoding and decoding specific IEEE 754
+interchange formats via a 'Data.Binary.Binary' instance.
 -}
 module Numeric.Decimal
        ( -- * Usage
@@ -50,12 +53,30 @@ module Numeric.Decimal
        , GeneralDecimal
 
          -- ** Number types with defined encodings
-       , Decimal32 , toDecimal32 , fromDecimal32
-       , Decimal64 , toDecimal64 , fromDecimal64
-       , Decimal128, toDecimal128, fromDecimal128
+         -- $encodings
+       , Decimal32
+       , Decimal64
+       , Decimal128
 
          -- ** Precision types
-       , module Numeric.Decimal.Precision
+       , Precision
+       , FinitePrecision
+
+       , P1 , P2 , P3 , P4 , P5 , P6 , P7 , P8 , P9 , P10
+       , P11, P12, P13, P14, P15, P16, P17, P18, P19, P20
+       , P21, P22, P23, P24, P25, P26, P27, P28, P29, P30
+       , P31, P32, P33, P34, P35, P36, P37, P38, P39, P40
+       , P41, P42, P43, P44, P45, P46, P47, P48, P49, P50
+
+       , P75, P100, P150, P200, P250, P300, P400, P500, P1000, P2000
+
+       , PPlus1, PTimes2
+
+       , PInfinite
+
+       , Pdecimal32
+       , Pdecimal64
+       , Pdecimal128
 
          -- ** Rounding types
        , Rounding
@@ -98,19 +119,16 @@ and/or 'PTimes2' to any existing precision.
 * 'GeneralDecimal' is a number type with infinite precision. Note that not all
 operations support numbers with infinite precision.
 
+* 'Decimal32', 'Decimal64', and 'Decimal128' are specialized number types with
+'Data.Binary.Binary' instances that implement the /decimal32/, /decimal64/,
+and /decimal128/ interchange format encodings described in IEEE 754-2008.
+These types have precisions of 7, 16, and 34 decimal digits, respectively, and
+round half even.
+
 * The most versatile 'Decimal' type constructor is parameterized by both a
 precision and a rounding algorithm. For example, @'Decimal' 'P20' 'RoundDown'@
 is a number type with 20 decimal digits of precision that rounds down
 (truncates). Several 'Rounding' algorithms are available to choose from.
-
-* 'Decimal32', 'Decimal64', and 'Decimal128' are specialized number types with
-'Data.Binary.Binary' instances that implement the /decimal32/, /decimal64/,
-and /decimal128/ interchange format encodings described in IEEE 754-2008.
-
-It is suggested to create an alias for the type of numbers you wish to support
-in your application. For example:
-
-> type Number = ExtendedDecimal P16
 
 A decimal number type may be used in a @default@ declaration, possibly
 replacing 'Double' and/or 'Integer'. For example:
@@ -123,4 +141,19 @@ Additional operations and control beyond what is provided by the standard type
 classes are available through the use of "Numeric.Decimal.Arithmetic" and
 "Numeric.Decimal.Operation". Advanced string conversion is also available
 through "Numeric.Decimal.Conversion".
+
+It is possible to create arbitrary width interchange format encodings with the
+help of "Numeric.Decimal.Encoding".
+-}
+
+{- $encodings
+
+These decimal number types have a 'Data.Binary.Binary' instance that
+implements a specific interchange format encoding described in IEEE
+754-2008. See "Numeric.Decimal.Encoding" for further details, including the
+ability to create additional formats of arbitrary width.
+
+Alternative rounding algorithms can be used through the more general 'Decimal'
+type constructor and the special precision types 'Pdecimal32', 'Pdecimal64',
+or 'Pdecimal128', e.g. @'Decimal' 'Pdecimal64' 'RoundCeiling'@.
 -}

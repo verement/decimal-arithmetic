@@ -93,7 +93,7 @@ signMatch x = case signum x of
   _  -> Pos
 
 type Coefficient = Natural
-type Exponent    = Int
+type Exponent    = Integer
 type Payload     = Coefficient
 
 -- | A decimal floating point number with selectable precision and rounding
@@ -142,10 +142,13 @@ Just (N (0,123,0))
 Just (N (1,120,-1))
 -}
 
+decimalPrecision :: Decimal p r -> p
+decimalPrecision = undefined
+
 instance Precision p => Precision (Decimal p r) where
   precision = precision . decimalPrecision
-    where decimalPrecision :: Decimal p r -> p
-          decimalPrecision = undefined
+  eMax      = eMax      . decimalPrecision
+  eMin      = eMin      . decimalPrecision
 
 -- This assumes the arithmetic operation does not trap any signals, which
 -- could result in an exception being thrown (and returned in a Left value).
@@ -382,7 +385,9 @@ prop> isFinite x && x >= 0 ==> coefficient (sqrt (x * x) - (x :: ExtendedDecimal
 instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
   floatRadix  _ = 10
   floatDigits x = let Just p = precision x in p
-  floatRange  _ = (minBound, maxBound)  -- ?
+  floatRange  x = let Just emin = eMin x
+                      Just emax = eMax x
+                  in (fromIntegral emin, fromIntegral emax)
 
   decodeFloat x = case x of
     Num { sign = s, coefficient = c, exponent = e } -> (m, n)
@@ -617,16 +622,6 @@ fromOrdering GT = one
 -- | Upper limit on the absolute value of the exponent
 eLimit :: Precision p => p -> Maybe Exponent
 eLimit = eMax -- ?
-
--- | Minimum value of the adjusted exponent
-eMin :: Precision p => p -> Maybe Exponent
-eMin n = (1 -) <$> eMax n
-
--- | Maximum value of the adjusted exponent
-eMax :: Precision p => p -> Maybe Exponent
-eMax n = subtract 1 . (10 ^) . numDigits <$> base
-  where mlength = precision n                    :: Maybe Int
-        base = (10 *) . fromIntegral <$> mlength :: Maybe Coefficient
 
 -- | Minimum value of the exponent for subnormal results
 eTiny :: Precision p => p -> Maybe Exponent

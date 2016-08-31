@@ -1,105 +1,185 @@
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
 
+-- | This module implements the decimal interchange format encodings described
+-- in IEEE 754-2008, including the /decimal32/, /decimal64/, and /decimal128/
+-- formats, as well as arbitrary width /decimal{k}/ formats through the use of
+-- 'Format' with 'KPlus32' and\/or 'KTimes2'. For example, to use a
+-- /decimal96/ format:
+--
+-- > type Decimal96 = ExtendedDecimal (Format (KPlus32 K64) DecimalCoefficient)
+--
+-- Currently only a decimal encoding of coefficients is implemented, but a
+-- binary encoding may be added in the future.
 module Numeric.Decimal.Encoding (
-    Decimal32 , toDecimal32 , fromDecimal32
-  , Decimal64 , toDecimal64 , fromDecimal64
-  , Decimal128, toDecimal128, fromDecimal128
+    -- * Primary convenience types
+    Decimal32
+  , Decimal64
+  , Decimal128
+
+    -- ** Precision types
+  , Pdecimal32
+  , Pdecimal64
+  , Pdecimal128
+
+    -- * Interchange format types
+  , Format
+
+    -- ** Format parameters
+  , Parameters
+  , K32
+  , K64
+  , K128
+  , KPlus32
+  , KTimes2
+
+    -- ** Coefficient encodings
+  -- , CoefficientEncoding
+  , DecimalCoefficient
+  , BinaryCoefficient
   ) where
 
 import Prelude hiding (exponent)
 
-import Data.Binary (Binary(get, put))
+import Data.Binary (Binary(get, put), Get)
 import Data.Binary.Bits.Get (BitGet, getBool, getWord8, getWord16be, runBitGet)
 import Data.Binary.Bits.Put (BitPut, putBool, putWord8, putWord16be, runBitPut)
-import Data.Bits (Bits(bit, shiftL, shiftR, testBit), FiniteBits, (.&.), (.|.))
+import Data.Bits (bit, shiftL, shiftR, testBit, (.&.), (.|.))
 import Data.Word (Word8, Word16)
 
 import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
 
+-- Decimal number types
+
 -- | A decimal floating point number with 7 digits of precision, rounding half
--- even, having a 32-bit encoded representation
-newtype Decimal32 = Decimal32 { fromDecimal32 :: ExtendedDecimal P7 }
-                  deriving (Enum, Eq, Floating, Fractional, Num, Ord, Real,
-                            RealFloat, RealFrac, Bits, FiniteBits, Precision)
-
-toDecimal32 :: ExtendedDecimal P7 -> Decimal32
-toDecimal32 = Decimal32
-
-instance Show Decimal32 where
-  showsPrec d (Decimal32 n) = showsPrec d n
-
-instance Read Decimal32 where
-  readsPrec d str = [ (Decimal32 n, s) | (n, s) <- readsPrec d str ]
-
--- | The 'Binary' instance implements the /decimal32/ interchange format
--- described in IEEE 754-2008 using a /decimal/ encoding for the coefficient.
-instance Binary Decimal32 where
-  put = runBitPut . putDecimal32
-  get = runBitGet   getDecimal32
+-- even, and a 32-bit encoded representation using the /decimal32/ interchange
+-- format (with a decimal encoding for the coefficient)
+type Decimal32 = ExtendedDecimal Pdecimal32
 
 -- | A decimal floating point number with 16 digits of precision, rounding
--- half even, having a 64-bit encoded representation
-newtype Decimal64 = Decimal64 { fromDecimal64 :: ExtendedDecimal P16 }
-                  deriving (Enum, Eq, Floating, Fractional, Num, Ord, Real,
-                            RealFloat, RealFrac, Bits, FiniteBits, Precision)
-
-toDecimal64 :: ExtendedDecimal P16 -> Decimal64
-toDecimal64 = Decimal64
-
-instance Show Decimal64 where
-  showsPrec d (Decimal64 n) = showsPrec d n
-
-instance Read Decimal64 where
-  readsPrec d str = [ (Decimal64 n, s) | (n, s) <- readsPrec d str ]
-
--- | The 'Binary' instance implements the /decimal64/ interchange format
--- described in IEEE 754-2008 using a /decimal/ encoding for the coefficient.
-instance Binary Decimal64 where
-  put = runBitPut . putDecimal64
-  get = runBitGet   getDecimal64
+-- half even, and a 64-bit encoded representation using the /decimal64/
+-- interchange format (with a decimal encoding for the coefficient)
+type Decimal64 = ExtendedDecimal Pdecimal64
 
 -- | A decimal floating point number with 34 digits of precision, rounding
--- half even, having a 128-bit encoded representation
-newtype Decimal128 = Decimal128 { fromDecimal128 :: ExtendedDecimal P34 }
-                   deriving (Enum, Eq, Floating, Fractional, Num, Ord, Real,
-                             RealFloat, RealFrac, Bits, FiniteBits, Precision)
+-- half even, and a 128-bit encoded representation using the /decimal128/
+-- interchange format (with a decimal encoding for the coefficient)
+type Decimal128 = ExtendedDecimal Pdecimal128
 
-toDecimal128 :: ExtendedDecimal P34 -> Decimal128
-toDecimal128 = Decimal128
+-- Precision types
 
-instance Show Decimal128 where
-  showsPrec d (Decimal128 n) = showsPrec d n
+-- | A type with 'Precision' instance specifying /decimal32/ interchange
+-- format parameters (using a decimal encoding for the coefficient) having an
+-- effective precision of 7 decimal digits
+type Pdecimal32 = Format K32 DecimalCoefficient
 
-instance Read Decimal128 where
-  readsPrec d str = [ (Decimal128 n, s) | (n, s) <- readsPrec d str ]
+-- | A type with 'Precision' instance specifying /decimal64/ interchange
+-- format parameters (using a decimal encoding for the coefficient) having an
+-- effective precision of 16 decimal digits
+type Pdecimal64 = Format K64 DecimalCoefficient
 
--- | The 'Binary' instance implements the /decimal128/ interchange format
--- described in IEEE 754-2008 using a /decimal/ encoding for the coefficient.
-instance Binary Decimal128 where
-  put = runBitPut . putDecimal128
-  get = runBitGet   getDecimal128
+-- | A type with 'Precision' instance specifying /decimal128/ interchange
+-- format parameters (using a decimal encoding for the coefficient) having an
+-- effective precision of 34 decimal digits
+type Pdecimal128 = Format K128 DecimalCoefficient
 
--- Encoding and decoding functions
+-- Format parameters
 
-putDecimal32 :: Decimal32 -> BitPut ()
-putDecimal32 = putDecimal 6 2 101 . fromDecimal32
+-- | Interchange format parameters used to define an encoding and derive the
+-- format's /precision/ and E/max/
+class Parameters k where
+  -- | /k//32, the primary format parameter defining the encoding width as a
+  -- multiple of 32 bits
+  paramK32 :: k -> Int
 
-getDecimal32 :: BitGet Decimal32
-getDecimal32 = toDecimal32 <$> getDecimal 6 2 101
+-- | /p/, precision in digits
+paramP :: Parameters k => k -> Int
+paramP k = 9 * paramK32 k - 2
 
-putDecimal64 :: Decimal64 -> BitPut ()
-putDecimal64 = putDecimal 8 5 398 . fromDecimal64
+-- | /emax/
+paramEmax :: Parameters k => k -> Exponent
+paramEmax k = 3 * 2^(paramK32 k * 2 + 3)
 
-getDecimal64 :: BitGet Decimal64
-getDecimal64 = toDecimal64 <$> getDecimal 8 5 398
+-- | /bias/, /E/ − /q/
+paramBias :: Parameters k => k -> Exponent
+paramBias k = paramEmax k + fromIntegral (paramP k - 2)
 
-putDecimal128 :: Decimal128 -> BitPut ()
-putDecimal128 = putDecimal 12 11 6176 . fromDecimal128
+-- | /w/, combination field width in bits − 5
+paramW :: Parameters k => k -> Int
+paramW k = paramK32 k * 2 + 4
 
-getDecimal128 :: BitGet Decimal128
-getDecimal128 = toDecimal128 <$> getDecimal 12 11 6176
+-- | /t//10, trailing significand field width in 10-bit multiples
+paramT10 :: Parameters k => k -> Int
+paramT10 k = 3 * paramK32 k - 1
+
+-- | Parameters for the /decimal32/ interchange format
+data K32
+instance Parameters K32 where
+  paramK32 _ = 1
+
+-- | Parameters for the /decimal64/ interchange format
+type K64 = KPlus32 K32
+
+-- | Parameters for the /decimal128/ interchange format
+type K128 = KTimes2 K64
+
+-- | Parameters for a /decimal{@k@ + 32}/ interchange format
+data KPlus32 k
+instance Parameters k => Parameters (KPlus32 k) where
+  paramK32 t = paramK32 (minus32 t) + 1
+    where minus32 :: KPlus32 k -> k
+          minus32 = undefined
+
+-- | Parameters for a /decimal{@k@ × 2}/ interchange format
+data KTimes2 k
+instance Parameters k => Parameters (KTimes2 k) where
+  paramK32 t = paramK32 (div2 t) * 2
+    where div2 :: KTimes2 k -> k
+          div2 = undefined
+
+-- | A class encapsulating coefficient encodings
+class CoefficientEncoding c
+
+-- | Specify a decimal encoding for the coefficient.
+data DecimalCoefficient
+instance CoefficientEncoding DecimalCoefficient
+
+-- | Specify a binary encoding for the coefficient (currently unimplemented).
+data BinaryCoefficient
+instance CoefficientEncoding BinaryCoefficient
+
+-- | A type (with a 'Precision' instance) for specifying interchange format
+-- parameters @k@ and coefficient encoding @c@
+data Format k c
+
+formatK :: Format k c -> k
+formatK = undefined
+
+-- | This 'Precision' instance automatically computes the /precision/ and
+-- E/max/ of decimal numbers that use this format.
+instance Parameters k => Precision (Format k c) where
+  precision = Just . paramP    . formatK
+  eMax      = Just . paramEmax . formatK
+
+instance Parameters k => FinitePrecision (Format k c)
+
+-- | A 'Binary' instance is defined for interchange formats for which a
+-- 'Parameters' instance exists, and covers particularly the 'Decimal32',
+-- 'Decimal64', and 'Decimal128' types.
+instance Parameters k => Binary (Decimal (Format k DecimalCoefficient) r) where
+  put d = runBitPut $ putDecimal (paramW k) (paramT10 k) (paramBias k) d
+    where k = formatK (decimalFormat d)
+
+          decimalFormat :: Decimal (Format k c) r -> Format k c
+          decimalFormat = undefined
+
+  get = result
+    where result = runBitGet $ getDecimal (paramW k) (paramT10 k) (paramBias k)
+          k = formatK (getDecimalFormat result)
+
+          getDecimalFormat :: Get (Decimal (Format k c) r) -> Format k c
+          getDecimalFormat = undefined
 
 -- Densely Packed Decimal
 
@@ -152,7 +232,7 @@ bcd2dpd d2 d1 d0 = case (d2 < 8, d1 < 8, d0 < 8) of
         isolate :: Word8 -> Word8 -> Int -> Word16
         isolate d m = shiftL (fromIntegral $ d .&. m)
 
--- Low-level functions
+-- Low-level encoding/decoding
 
 data CombinationField = Finite { exponentMSBs   :: Word8
                                , coefficientMSD :: Word8 }
@@ -248,3 +328,21 @@ putDecimal ecbits cclen bias x = do
           putDigits rest
         putDigits [] = return ()
         putDigits _ = error "putDigits: invalid # digits"
+
+{- $doctest
+>>> :set -XOverloadedStrings
+>>> import Data.Binary
+
+>>> encode (read "-7.50" :: Decimal64) == "\xA2\x30\x00\x00\x00\x00\x03\xD0"
+True
+
+>>> decode "\xA2\x30\x00\x00\x00\x00\x03\xD0" :: Decimal64
+-7.50
+
+>>> decode "\x78\xFF\xFF\xFF\xFF\xFF\xFF\xFF" :: Decimal64
+Infinity
+
+-- prop> decode (encode x) == (x :: Decimal32)
+-- prop> decode (encode x) == (x :: Decimal64)
+-- prop> decode (encode x) == (x :: Decimal128)
+-}

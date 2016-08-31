@@ -40,9 +40,9 @@ library
   exposed-modules:     Numeric.Decimal
                        Numeric.Decimal.Arithmetic
                        Numeric.Decimal.Conversion
+                       Numeric.Decimal.Encoding
                        Numeric.Decimal.Operation
-  other-modules:       Numeric.Decimal.Encoding
-                       Numeric.Decimal.Exception
+  other-modules:       Numeric.Decimal.Exception
                        Numeric.Decimal.Number
                        Numeric.Decimal.Precision
                        Numeric.Decimal.Rounding
@@ -55,7 +55,6 @@ library
   default-language:    Haskell2010
   default-extensions:  Trustworthy
   other-extensions:    FlexibleInstances
-                       GeneralizedNewtypeDeriving
                        MultiParamTypeClasses
                        RoleAnnotations
 

@@ -4,20 +4,19 @@
 
 module Numeric.Decimal.Number
        ( Sign(..)
-       , Decimal(..)
        , Coefficient
+       , Exponent
+       , Decimal(..)
        , numDigits
        ) where
 
 import Numeric.Natural (Natural)
 
-import Numeric.Decimal.Precision
-
 data Sign = Pos | Neg
 instance Eq Sign
 
 type Coefficient = Natural
-type Exponent    = Int
+type Exponent    = Integer
 type Payload     = Coefficient
 
 type role Decimal phantom phantom
@@ -32,7 +31,5 @@ data Decimal p r
         , signaling   :: Bool
         , payload     :: Payload
         }
-
-instance Precision p => Precision (Decimal p r)
 
 numDigits :: Coefficient -> Int

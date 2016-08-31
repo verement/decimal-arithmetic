@@ -105,9 +105,8 @@ basicDefaultContext = newContext { trapHandler = handler }
         disabled = [Inexact, Rounded, Subnormal]
 
 -- | Return a new context with all signal flags cleared, all traps disabled
--- (IEEE 854 §7), using selectable precision (the IEEE 754 smallest and basic
--- formats correspond to precisions 'P7', 'P16', or 'P34'), and rounding half
--- even (IEEE 754 §4.3.3).
+-- (IEEE 854 §7), using selectable precision, and rounding half even (IEEE 754
+-- §4.3.3).
 extendedDefaultContext :: Context p RoundHalfEven
 extendedDefaultContext = newContext
 

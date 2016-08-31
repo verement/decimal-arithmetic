@@ -16,11 +16,25 @@ module Numeric.Decimal.Precision
        , PInfinite
        ) where
 
+import {-# SOURCE #-} Numeric.Decimal.Number
+
 -- | Precision indicates the maximum number of significant decimal digits a
 -- number may have.
 class Precision p where
   -- | Return the precision of the argument, or 'Nothing' if the precision is infinite.
   precision :: p -> Maybe Int
+
+  -- | Return the maximum exponent for a number in scientific notation with
+  -- the given precision, or 'Nothing' if the exponent has no limit.
+  eMax :: p -> Maybe Exponent
+  eMax n = subtract 1 . (10 ^) . numDigits <$> base
+    where mlength = precision n                       :: Maybe Int
+          base    = (10 *) . fromIntegral <$> mlength :: Maybe Coefficient
+
+  -- | Return the minimum exponent for a number in scientific notation with
+  -- the given precision, or 'Nothing' if the exponent has no limit.
+  eMin :: p -> Maybe Exponent
+  eMin = fmap (1 -) . eMax
 
 -- | A subclass of precisions that are finite
 class Precision p => FinitePrecision p
@@ -29,6 +43,7 @@ class Precision p => FinitePrecision p
 data PInfinite
 instance Precision PInfinite where
   precision _ = Nothing
+  eMax      _ = Nothing
 
 -- | A precision of 1 significant digit
 data P1
