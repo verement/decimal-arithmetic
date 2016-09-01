@@ -335,6 +335,10 @@ arcsine x = infiniteSeries (x : series 1 2 x 3)
 seriesPi :: FinitePrecision p => Decimal p RoundHalfEven
 seriesPi = 6 * arcsine oneHalf
 
+-- | Precomputed π to a precision of 50 digits
+fastPi :: FinitePrecision p => Decimal p RoundHalfEven
+fastPi = 3.1415926535897932384626433832795028841971693993751
+
 -- | Cast a number with two additional digits of precision down to a number
 -- with the desired precision.
 castDown :: (Precision p, Rounding r)
@@ -347,7 +351,10 @@ notyet = error . (++ ": not yet implemented")
 -- | The trigonometric and hyperbolic 'Floating' methods (other than the
 -- precision-dependent constant 'pi') are not yet implemented.
 instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
-  pi = castDown seriesPi
+  pi = pi'
+    where pi' | p <= 50   = castRounding fastPi
+              | otherwise = castDown seriesPi
+          Just p = precision pi'
 
   exp = castRounding . evalOp . Op.exp
   log = castRounding . evalOp . Op.ln
