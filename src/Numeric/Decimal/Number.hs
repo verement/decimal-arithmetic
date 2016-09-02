@@ -155,6 +155,9 @@ instance Precision p => Precision (Decimal p r) where
 evalOp :: Arith p r a -> a
 evalOp op = let Right r = evalArith op newContext in r
 
+evalOp' :: Arith p RoundHalfEven a -> a
+evalOp' = evalOp
+
 compareDecimal :: Decimal a b -> Decimal c d -> Either GeneralDecimal Ordering
 compareDecimal x y = evalOp (x `Op.compare` y)
 
@@ -348,8 +351,8 @@ castDown = cast
 notyet :: String -> a
 notyet = error . (++ ": not yet implemented")
 
--- | The trigonometric and hyperbolic 'Floating' methods (other than the
--- precision-dependent constant 'pi') are not yet implemented.
+-- | The trigonometric 'Floating' methods (other than the precision-dependent
+-- constant 'pi') are not yet implemented.
 instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   pi = castRounding pi'
     where pi' | p <= 50   = fastPi
@@ -369,17 +372,34 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
 
   sin   = notyet "sin"
   cos   = notyet "cos"
+  tan   = notyet "tan"
 
   asin  = notyet "asin"
   acos  = notyet "acos"
   atan  = notyet "atan"
 
-  sinh  = notyet "sinh"
-  cosh  = notyet "cosh"
+  -- sinh x = let ex = exp x in (ex^2 - 1) / (2 * ex)
+  sinh x = castRounding . castDown . evalOp' $
+    Op.exp x >>= \ex -> two `Op.multiply` ex >>= \tex ->
+    ex `Op.multiply` ex >>= (`Op.subtract` one) >>= (`Op.divide` tex)
+  -- cosh x = let ex = exp x in (ex^2 + 1) / (2 * ex)
+  cosh x = castRounding . castDown . evalOp' $
+    Op.exp x >>= \ex -> two `Op.multiply` ex >>= \tex ->
+    ex `Op.multiply` ex >>= (`Op.add` one) >>= (`Op.divide` tex)
+  -- tanh x = let e2x = exp (2 * x) in (e2x - 1) / (e2x + 1)
+  tanh x = castRounding . castDown . evalOp' $
+    two `Op.multiply` x >>= Op.exp >>= \e2x ->
+    e2x `Op.subtract` one >>= \e2xm1 -> e2x `Op.add` one >>= (e2xm1 `Op.divide`)
 
-  asinh = notyet "asinh"
-  acosh = notyet "acosh"
-  atanh = notyet "atanh"
+  -- asinh x = log (x + sqrt (x^2 + 1))
+  asinh x = castRounding . castDown . evalOp' $ x `Op.multiply` x >>=
+    (`Op.add` one) >>= Op.squareRoot >>= (x `Op.add`) >>= Op.ln
+  -- acosh x = log (x + sqrt (x^2 - 1))
+  acosh x = castRounding . castDown . evalOp' $ x `Op.multiply` x >>=
+    (`Op.subtract` one) >>= Op.squareRoot >>= (x `Op.add`) >>= Op.ln
+  -- atanh x = log ((1 + x) / (1 - x)) / 2
+  atanh x = castRounding . castDown . evalOp' $ one `Op.add` x >>= \xp1 ->
+    one `Op.subtract` x >>= (xp1 `Op.divide`) >>= Op.ln >>= Op.multiply oneHalf
 
 {- $doctest-Floating
 prop> realToFrac (pi :: ExtendedDecimal P16) == (pi :: Double)
