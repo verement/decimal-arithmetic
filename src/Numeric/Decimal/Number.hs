@@ -255,10 +255,11 @@ instance (Precision p, Rounding r) => Num (Decimal p r) where
   abs    = evalOp . Op.abs
 
   signum n = case n of
-    Num { coefficient = 0 } -> zero
-    Num { sign = s        } -> one { sign = s }
-    Inf { sign = s        } -> one { sign = s }
-    _                       -> n
+    Num { sign = s, coefficient = c }
+      | c == 0       -> zero { sign = s }
+      | otherwise    -> one  { sign = s }
+    Inf { sign = s } -> one  { sign = s }
+    _                -> qNaN
 
   fromInteger x = cast
     Num { sign        = signMatch x
