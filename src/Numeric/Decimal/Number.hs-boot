@@ -13,7 +13,6 @@ module Numeric.Decimal.Number
 import Numeric.Natural (Natural)
 
 data Sign = Pos | Neg
-instance Eq Sign
 
 type Coefficient = Natural
 type Exponent    = Integer

@@ -376,13 +376,13 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
 
   sqrt = castRounding . evalOp . Op.squareRoot
 
-  sin   = notyet "sin"
-  cos   = notyet "cos"
-  tan   = notyet "tan"
+  sin  = notyet "sin"
+  cos  = notyet "cos"
+  tan  = notyet "tan"
 
-  asin  = notyet "asin"
-  acos  = notyet "acos"
-  atan  = notyet "atan"
+  asin = notyet "asin"
+  acos = notyet "acos"
+  atan = notyet "atan"
 
   -- sinh x = let ex = exp x in (ex^2 - 1) / (2 * ex)
   sinh x = castRounding . castDown . evalOp' $
@@ -651,11 +651,9 @@ fromBool True  = one
 
 -- | Return 'False' if the argument is zero or NaN, and 'True' otherwise.
 toBool :: Decimal p r -> Bool
-toBool Num { coefficient = c }
-  | c == 0    = False
-  | otherwise = True
-toBool Inf{}  = True
-toBool _      = False
+toBool Num { coefficient = c } = c /= 0
+toBool NaN{}                   = False
+toBool _                       = True
 
 -- | Return @-1@, @0@, or @1@ if the argument is 'LT', 'EQ', or 'GT',
 -- respectively. This allows an all-decimal usage of the operations from

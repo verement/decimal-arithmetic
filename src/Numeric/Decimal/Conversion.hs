@@ -317,7 +317,7 @@ toNumber = parseSign flipSign <*> parseNumericString
         parseInfinity = do
           parseString "Inf"
           optional $ parseString "inity"
-          return Inf { sign = Pos }
+          return infinity
 
         parseNaN :: ReadP (Decimal p r)
         parseNaN = parseQNaN <|> parseSNaN

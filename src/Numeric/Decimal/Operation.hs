@@ -1577,7 +1577,7 @@ instance Show Class where
           signChar Neg = '-'
 
           showNumberClass :: NumberClass -> String
-          showNumberClass s = case s of
+          showNumberClass nc = case nc of
             ZeroClass      -> "Zero"
             SubnormalClass -> "Subnormal"
             NormalClass    -> "Normal"
@@ -2169,8 +2169,7 @@ rotate n@Num { coefficient = c } s@Num { sign = d, coefficient = sc }
         (b , b') = case d of
           Pos -> (10^sc , 10^sc')
           Neg -> (10^sc', 10^sc )
-        Just p = precision z
-        sc'    = p - fromIntegral sc
+        sc' = finitePrecision z - fromIntegral sc
 
 rotate n@Inf {                   } s | validShift z s = return z
   where z = coerce n
