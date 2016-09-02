@@ -341,8 +341,8 @@ fastPi = 3.1415926535897932384626433832795028841971693993751
 
 -- | Cast a number with two additional digits of precision down to a number
 -- with the desired precision.
-castDown :: (Precision p, Rounding r)
-         => Decimal (PPlus1 (PPlus1 p)) a -> Decimal p r
+castDown :: Precision p
+         => Decimal (PPlus1 (PPlus1 p)) a -> Decimal p RoundHalfEven
 castDown = cast
 
 notyet :: String -> a
@@ -351,8 +351,8 @@ notyet = error . (++ ": not yet implemented")
 -- | The trigonometric and hyperbolic 'Floating' methods (other than the
 -- precision-dependent constant 'pi') are not yet implemented.
 instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
-  pi = pi'
-    where pi' | p <= 50   = castRounding fastPi
+  pi = castRounding pi'
+    where pi' | p <= 50   = fastPi
               | otherwise = castDown seriesPi
           Just p = precision pi'
 
