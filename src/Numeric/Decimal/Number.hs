@@ -417,12 +417,16 @@ instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
                   in (fromIntegral emin, fromIntegral emax)
 
   decodeFloat x = case x of
-    Num { sign = s, coefficient = c, exponent = e } -> (m, n)
-      where m = signFunc s (fromIntegral c)
-            n = fromIntegral e
+    Num { sign = s, coefficient = c, exponent = e }
+      | c == 0    -> (0, 0)
+      | otherwise -> (m, n)
+      where m = signFunc s (fromIntegral $ c * 10^d)
+            n = fromIntegral e - d
+            d = floatDigits x - numDigits c
     Inf { sign = s                                } -> (special s 0, maxBound)
     NaN { sign = s, signaling = sig, payload = p  } -> (special s p, n)
       where n = minBound + fromEnum sig
+
     where special :: Sign -> Coefficient -> Integer
           special s v = signFunc s (pp + fromIntegral v)
           pp = 10 ^ floatDigits x :: Integer
@@ -438,6 +442,7 @@ instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
             | n == minBound     = qNaN { sign = signMatch m, payload = p }
             | otherwise         = sNaN { sign = signMatch m, payload = p }
             where p = fromInteger (am - pp)
+
           am = abs m              :: Integer
           pp = 10 ^ floatDigits x :: Integer
 
@@ -458,10 +463,18 @@ instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
   isIEEE _ = True
 
 {- $doctest-RealFloat
-prop> uncurry encodeFloat (decodeFloat x) == (x :: BasicDecimal)
-prop> isFinite x ==> significand x * fromInteger (floatRadix x) ^^ Prelude.exponent x == (x :: BasicDecimal)
+prop> isFinite x ==> let b = floatRadix (x :: BasicDecimal); (m, n) = decodeFloat x in x == fromInteger m * fromInteger b ^^ n
+prop> isFinite x && x /= 0 ==> let b = floatRadix (x :: BasicDecimal); (m, n) = decodeFloat x; d = floatDigits x; am = Prelude.abs m in b^(d-1) <= am && am < b^d
+prop> decodeFloat (0 :: BasicDecimal) == (0,0)
+prop> decodeFloat (read "-0" :: BasicDecimal) == (0,0)
+
+prop> not (isNegativeZero x) ==> uncurry encodeFloat (decodeFloat x) == (x :: BasicDecimal)
+
 prop> Prelude.exponent (0 :: BasicDecimal) == 0
 prop> isFinite x && x /= 0 ==> Prelude.exponent (x :: BasicDecimal) == snd (decodeFloat x) + floatDigits x
+prop> isFinite x ==> let b = floatRadix (x :: BasicDecimal) in x == significand x * fromInteger b ^^ Prelude.exponent x
+
+prop> isFinite x ==> let s = significand (x :: BasicDecimal); b = floatRadix x in s == 0 || (s > -1 && s < 1 && abs s >= 1 / fromInteger b)
 
 prop> isNegativeZero (read "-0" :: BasicDecimal) == True
 prop> isNegativeZero (read "+0" :: BasicDecimal) == False
