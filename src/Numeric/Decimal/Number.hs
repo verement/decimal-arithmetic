@@ -363,9 +363,14 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   exp = castRounding . evalOp . Op.exp
   log = castRounding . evalOp . Op.ln
 
-  logBase 10 x = castRounding $ evalOp (Op.log10 x)
-  logBase _  1 = zero
-  logBase b  x = evalOp (join $ Op.divide <$> Op.ln x <*> Op.ln b)
+  logBase b@Num{} x
+    | b == ten = castRounding $ evalOp (Op.log10 x)
+    | x == one = case b `compare` one of
+        LT -> zero { sign = Neg }
+        EQ -> qNaN
+        GT -> zero
+    | x == b && not (isZero b) = one
+  logBase b x = evalOp (join $ Op.divide <$> Op.ln x <*> Op.ln b)
 
   x ** y = evalOp (x `Op.power` y)
 
