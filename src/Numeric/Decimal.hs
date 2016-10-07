@@ -131,8 +131,8 @@ precision and a rounding algorithm. For example, @'Decimal' 'P20' 'RoundDown'@
 is a number type with 20 decimal digits of precision that rounds down
 (truncates). Several 'Rounding' algorithms are available to choose from.
 
-A decimal number type may be used in a @default@ declaration, possibly
-replacing 'Double' and/or 'Integer'. For example:
+A decimal number type may be used in a @default@ declaration, for example
+replacing 'Double':
 
 > default (Integer, BasicDecimal)
 -}
