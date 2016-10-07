@@ -46,6 +46,9 @@ module Numeric.Decimal
        ( -- * Usage
          -- $usage
 
+         -- ** Advanced usage
+         -- $advanced-usage
+
          -- * Arbitrary-precision decimal numbers
          Decimal
        , BasicDecimal
@@ -132,8 +135,9 @@ A decimal number type may be used in a @default@ declaration, possibly
 replacing 'Double' and/or 'Integer'. For example:
 
 > default (Integer, BasicDecimal)
+-}
 
-== Advanced usage
+{- $advanced-usage
 
 Additional operations and control beyond what is provided by the standard type
 classes are available through the use of "Numeric.Decimal.Arithmetic" and
