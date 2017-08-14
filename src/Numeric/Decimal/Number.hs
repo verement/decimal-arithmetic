@@ -62,10 +62,6 @@ import {-# SOURCE #-} qualified Numeric.Decimal.Operation as Op
 
 import qualified GHC.Real
 
-{- $setup
->>> :load Harness
--}
-
 data Sign = Pos  -- ^ Positive or non-negative
           | Neg  -- ^ Negative
           deriving (Eq, Enum)
@@ -134,14 +130,6 @@ instance (Precision p, Rounding r) => Read (Decimal p r) where
                     | (n, s) <- readParen False
                       (readP_to_S toNumber . dropWhile isSpace) str ]
 
-{- $doctest-Read
->>> fmap toRep (read "Just 123" :: Maybe GeneralDecimal)
-Just (N (0,123,0))
-
->>> fmap toRep (read "Just (-12.0)" :: Maybe GeneralDecimal)
-Just (N (1,120,-1))
--}
-
 decimalPrecision :: Decimal p r -> p
 decimalPrecision = undefined
 
@@ -197,16 +185,6 @@ instance Ord (Decimal p r) where
   max x y = evalOp (Op.max x y)
   min x y = evalOp (Op.min x y)
 
-{- $doctest-Ord
-prop> x > y ==> max x y == x && max y x == (x :: BasicDecimal)
-prop> x < y ==> min x y == x && min y x == (x :: BasicDecimal)
-
-prop> max x y == x ==> x >= y
-prop> max x y == y ==> y >= x
-prop> min x y == x ==> x <= y
-prop> min x y == y ==> y <= x
--}
-
 -- | Unlike the instances for 'Float' and 'Double', the lists returned by the
 -- 'enumFromTo' and 'enumFromThenTo' methods in this instance terminate with
 -- the last element strictly less than (greater than in the case of a negative
@@ -235,17 +213,6 @@ enumFromWith :: (Precision p, Rounding r)
              => Decimal p r -> Decimal p r -> [Decimal p r]
 enumFromWith x i = x : enumFromWith (x + i) i
 
-{- $doctest-Enum
->>> [0, 0.1 .. 2] :: [BasicDecimal]
-[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0]
-
->>> [2, 1.9 .. 0] :: [BasicDecimal]
-[2,1.9,1.8,1.7,1.6,1.5,1.4,1.3,1.2,1.1,1.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]
-
->>> [1.7 .. 5.7] :: [BasicDecimal]
-[1.7,2.7,3.7,4.7,5.7]
--}
-
 instance (Precision p, Rounding r) => Num (Decimal p r) where
   x + y = evalOp (x `Op.add`      y)
   x - y = evalOp (x `Op.subtract` y)
@@ -267,15 +234,6 @@ instance (Precision p, Rounding r) => Num (Decimal p r) where
         , exponent    = 0
         }
 
-{- $doctest-Num
-prop> x + x == x * (2 :: GeneralDecimal)
-prop> isFinite x ==> x - x == (0 :: GeneralDecimal)
-prop> isFinite x ==> x + negate x == (0 :: GeneralDecimal)
-prop> abs x >= (0 :: GeneralDecimal)
-
-prop> abs x * signum x == (x :: GeneralDecimal)
--}
-
 instance (Precision p, Rounding r) => Real (Decimal p r) where
   toRational Num { sign = s, coefficient = c, exponent = e }
     | e >= 0    = fromInteger $ signFunc s (fromIntegral c * 10^e)
@@ -290,16 +248,6 @@ instance (FinitePrecision p, Rounding r) => Fractional (Decimal p r) where
                        d = fromInteger (denominator r) :: GeneralDecimal
                    in evalOp (n `Op.divide` d)
 
-{- $doctest-Fractional
-prop> (4.14 :: Decimal P2 RoundHalfUp)   == 4.1
-prop> (4.15 :: Decimal P2 RoundHalfUp)   == 4.2
-prop> (4.15 :: Decimal P2 RoundHalfDown) == 4.1
-prop> (4.15 :: Decimal P2 RoundHalfEven) == 4.2
-prop> (4.25 :: Decimal P2 RoundHalfEven) == 4.2
-prop> (4.35 :: Decimal P2 RoundHalfEven) == 4.4
-prop> (4.45 :: Decimal P2 RoundHalfEven) == 4.4
--}
-
 instance (FinitePrecision p, Rounding r) => RealFrac (Decimal p r) where
   properFraction x@Num { sign = s, coefficient = c, exponent = e }
     | e < 0     = (n, f)
@@ -308,13 +256,6 @@ instance (FinitePrecision p, Rounding r) => RealFrac (Decimal p r) where
           f = x { coefficient = r }
           (q, r) = c `quotRem` (10^(-e))
   properFraction nan = (0, nan)
-
-{- $doctest-RealFrac
-prop> let (n,f) = properFraction (x :: BasicDecimal) in x == fromIntegral n + f
-prop> let (n,f) = properFraction (x :: BasicDecimal) in (x < 0 && n <= 0) || (x >= 0 && n >= 0)
-prop> let (n,f) = properFraction (x :: BasicDecimal) in (x < 0 && f <= 0) || (x >= 0 && f >= 0)
-prop> let (n,f) = properFraction (x :: BasicDecimal) in isFinite f ==> abs f < 1
--}
 
 -- | Compute an infinite series to maximum precision.
 infiniteSeries :: (FinitePrecision p, Rounding r)
@@ -407,14 +348,6 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   atanh x = castRounding . castDown . evalOp' $ one `Op.add` x >>= \xp1 ->
     one `Op.subtract` x >>= (xp1 `Op.divide`) >>= Op.ln >>= Op.multiply oneHalf
 
-{- $doctest-Floating
-prop> realToFrac (pi :: ExtendedDecimal P16) == (pi :: Double)
-
-prop> y >= 0 ==> (x :: BasicDecimal) ** fromInteger y == x ^ y
-
-prop> isFinite x && x >= 0 ==> coefficient (sqrt (x * x) - (x :: ExtendedDecimal P16)) <= 1
--}
-
 instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
   floatRadix  _ = 10
   floatDigits x = let Just p = precision x in p
@@ -467,25 +400,6 @@ instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
     _                                   -> False
 
   isIEEE _ = True
-
-{- $doctest-RealFloat
-prop> isFinite x ==> let b = floatRadix (x :: BasicDecimal); (m, n) = decodeFloat x in x == fromInteger m * fromInteger b ^^ n
-prop> isFinite x && x /= 0 ==> let b = floatRadix (x :: BasicDecimal); (m, n) = decodeFloat x; d = floatDigits x; am = Prelude.abs m in b^(d-1) <= am && am < b^d
-prop> decodeFloat (0 :: BasicDecimal) == (0,0)
-prop> decodeFloat (read "-0" :: BasicDecimal) == (0,0)
-
-prop> not (isNegativeZero x) ==> uncurry encodeFloat (decodeFloat x) == (x :: BasicDecimal)
-
-prop> Prelude.exponent (0 :: BasicDecimal) == 0
-prop> isFinite x && x /= 0 ==> Prelude.exponent (x :: BasicDecimal) == snd (decodeFloat x) + floatDigits x
-prop> isFinite x ==> let b = floatRadix (x :: BasicDecimal) in x == significand x * fromInteger b ^^ Prelude.exponent x
-
-prop> isFinite x ==> let s = significand (x :: BasicDecimal); b = floatRadix x in s == 0 || (s > -1 && s < 1 && abs s >= 1 / fromInteger b)
-
-prop> isNegativeZero (read "-0" :: BasicDecimal) == True
-prop> isNegativeZero (read "+0" :: BasicDecimal) == False
-prop> x /= 0 ==> isNegativeZero (x :: BasicDecimal) == False
--}
 
 -- | The 'Bits' instance makes use of the logical operations from the
 -- /General Decimal Arithmetic Specification/ using a /digit-wise/

@@ -328,21 +328,3 @@ putDecimal ecbits cclen bias x = do
           putDigits rest
         putDigits [] = return ()
         putDigits _ = error "putDigits: invalid # digits"
-
-{- $doctest
->>> :set -XOverloadedStrings
->>> import Data.Binary
-
->>> encode (read "-7.50" :: Decimal64) == "\xA2\x30\x00\x00\x00\x00\x03\xD0"
-True
-
->>> decode "\xA2\x30\x00\x00\x00\x00\x03\xD0" :: Decimal64
--7.50
-
->>> decode "\x78\xFF\xFF\xFF\xFF\xFF\xFF\xFF" :: Decimal64
-Infinity
-
--- prop> decode (encode x) == (x :: Decimal32)
--- prop> decode (encode x) == (x :: Decimal64)
--- prop> decode (encode x) == (x :: Decimal128)
--}

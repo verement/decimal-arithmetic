@@ -124,10 +124,6 @@ import Numeric.Decimal.Rounding
 
 import qualified Numeric.Decimal.Number as Number
 
-{- $setup
->>> :load Harness
--}
-
 finitePrecision :: FinitePrecision p => Decimal p r -> Int
 finitePrecision n = let Just p = precision n in p
 
@@ -156,38 +152,6 @@ generalRules2 x         _                    = invalidOperation x
 -- This section describes the arithmetic operations on, and some other
 -- functions of, numbers, including subnormal numbers, negative zeros, and
 -- special values (see also IEEE 754 §5 and §6).
-
-{- $doctest-special-values
->>> op2 Op.add "Infinity" "1"
-Infinity
-
->>> op2 Op.add "NaN" "1"
-NaN
-
->>> op2 Op.add "NaN" "Infinity"
-NaN
-
->>> op2 Op.subtract "1" "Infinity"
--Infinity
-
->>> op2 Op.multiply "-1" "Infinity"
--Infinity
-
->>> op2 Op.subtract "-0" "0"
--0
-
->>> op2 Op.multiply "-1" "0"
--0
-
->>> op2 Op.divide "1" "0"
-Infinity
-
->>> op2 Op.divide "1" "-0"
--Infinity
-
->>> op2 Op.divide "-1" "0"
--Infinity
--}
 
 -- | 'add' takes two operands. If either operand is a /special value/ then the
 -- general rules apply.
@@ -223,14 +187,6 @@ add inf@Inf{} Num{} = return (coerce inf)
 add Num{} inf@Inf{} = return (coerce inf)
 add x y = generalRules2 x y
 
-{- $doctest-add
->>> op2 Op.add "12" "7.00"
-19.00
-
->>> op2 Op.add "1E+2" "1E+4"
-1.01E+4
--}
-
 -- | 'subtract' takes two operands. If either operand is a /special value/
 -- then the general rules apply.
 --
@@ -243,17 +199,6 @@ subtract :: (Precision p, Rounding r)
          => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
 subtract x = add x . flipSign
 
-{- $doctest-subtract
->>> op2 Op.subtract "1.3" "1.07"
-0.23
-
->>> op2 Op.subtract "1.3" "1.30"
-0.00
-
->>> op2 Op.subtract "1.3" "2.07"
--0.77
--}
-
 -- | 'minus' takes one operand, and corresponds to the prefix minus operator
 -- in programming languages.
 --
@@ -263,14 +208,6 @@ subtract x = add x . flipSign
 minus :: (Precision p, Rounding r) => Decimal a b -> Arith p r (Decimal p r)
 minus x = zero { exponent = exponent x } `subtract` x
 
-{- $doctest-minus
->>> op1 Op.minus "1.3"
--1.3
-
->>> op1 Op.minus "-1.3"
-1.3
--}
-
 -- | 'plus' takes one operand, and corresponds to the prefix plus operator in
 -- programming languages.
 --
@@ -278,14 +215,6 @@ minus x = zero { exponent = exponent x } `subtract` x
 -- /flags/.
 plus :: (Precision p, Rounding r) => Decimal a b -> Arith p r (Decimal p r)
 plus x = zero { exponent = exponent x } `add` x
-
-{- $doctest-plus
->>> op1 Op.plus "1.3"
-1.3
-
->>> op1 Op.plus "-1.3"
--1.3
--}
 
 -- | 'multiply' takes two operands. If either operand is a /special value/
 -- then the general rules apply. Otherwise, the operands are multiplied
@@ -313,23 +242,6 @@ multiply Num { sign = xs, coefficient = xc } Inf { sign = ys }
   | xc == 0   = invalidOperation qNaN
   | otherwise = return Inf { sign = xorSigns xs ys }
 multiply x y = generalRules2 x y
-
-{- $doctest-multiply
->>> op2 Op.multiply "1.20" "3"
-3.60
-
->>> op2 Op.multiply "7" "3"
-21
-
->>> op2 Op.multiply "0.9" "0.8"
-0.72
-
->>> op2 Op.multiply "0.9" "-0"
--0.0
-
->>> op2 Op.multiply "654321" "654321"
-4.28135971E+11
--}
 
 -- | 'exp' takes one operand. If the operand is a NaN then the general rules
 -- for special values apply.
@@ -396,26 +308,6 @@ exp n@Inf { sign = s }
   | otherwise = return zero
 exp x = coerce <$> generalRules1 x
 
-{- $doctest-exp
->>> op1 Op.exp "-Infinity"
-0
-
->>> op1 Op.exp "-1"
-0.367879441
-
->>> op1 Op.exp "0"
-1
-
->>> op1 Op.exp "1"
-2.71828183
-
->>> op1 Op.exp "0.693147181"
-2.00000000
-
->>> op1 Op.exp "+Infinity"
-Infinity
--}
-
 -- | 'fusedMultiplyAdd' takes three operands; the first two are multiplied
 -- together, using 'multiply', with sufficient precision and exponent range
 -- that the result is exact and unrounded. No /flags/ are set by the
@@ -439,17 +331,6 @@ fusedMultiplyAdd x y z =
 
         raise :: Exception a r -> Arith p r (Decimal p r)
         raise e = raiseSignal (exceptionSignal e) (coerce $ exceptionResult e)
-
-{- $doctest-fusedMultiplyAdd
->>> op3 Op.fusedMultiplyAdd "3" "5" "7"
-22
-
->>> op3 Op.fusedMultiplyAdd "3" "-5" "7"
--8
-
->>> op3 Op.fusedMultiplyAdd "888565290" "1557.96930" "-86087.7578"
-1.38435736E+12
--}
 
 -- | 'ln' takes one operand. If the operand is a NaN then the general rules
 -- for special values apply.
@@ -529,23 +410,6 @@ ln10 = getPrecision >>= \(Just p) ->
                          -> Arith p r (Decimal p RoundHalfEven)
                 subRound = subArith . roundDecimal
 
-{- $doctest-ln
->>> op1 Op.ln "0"
--Infinity
-
->>> op1 Op.ln "1.000"
-0
-
->>> op1 Op.ln "2.71828183"
-1.00000000
-
->>> op1 Op.ln "10"
-2.30258509
-
->>> op1 Op.ln "+Infinity"
-Infinity
--}
-
 -- | 'log10' takes one operand. If the operand is a NaN then the general rules
 -- for special values apply.
 --
@@ -586,29 +450,6 @@ log10 x@Num { sign = s, coefficient = c, exponent = e }
 log10 n@Inf { sign = Pos } = return (coerce n)
 log10 x = coerce <$> generalRules1 x
 
-{- $doctest-log10
->>> op1 Op.log10 "0"
--Infinity
-
->>> op1 Op.log10 "0.001"
--3
-
->>> op1 Op.log10 "1.000"
-0
-
->>> op1 Op.log10 "2"
-0.301029996
-
->>> op1 Op.log10 "10"
-1
-
->>> op1 Op.log10 "70"
-1.84509804
-
->>> op1 Op.log10 "+Infinity"
-Infinity
--}
-
 -- | 'divide' takes two operands. If either operand is a /special value/ then
 -- the general rules apply.
 --
@@ -648,38 +489,6 @@ divide Inf { sign = xs } Num { sign = ys } =
 divide Num { sign = xs } Inf { sign = ys } =
   return zero { sign = xorSigns xs ys }
 divide x y = generalRules2 x y
-
-{- $doctest-divide
->>> op2 Op.divide "1" "3"
-0.333333333
-
->>> op2 Op.divide "2" "3"
-0.666666667
-
->>> op2 Op.divide "5" "2"
-2.5
-
->>> op2 Op.divide "1" "10"
-0.1
-
->>> op2 Op.divide "12" "12"
-1
-
->>> op2 Op.divide "8.00" "2"
-4.00
-
->>> op2 Op.divide "2.400" "2.0"
-1.20
-
->>> op2 Op.divide "1000" "100"
-10
-
->>> op2 Op.divide "1000" "1"
-1000
-
->>> op2 Op.divide "2.40E+6" "2"
-1.20E+6
--}
 
 type Dividend  = Coefficient
 type Divisor   = Coefficient
@@ -729,20 +538,6 @@ abs x
   | isNegative x = minus x
   | otherwise    = plus  x
 
-{- $doctest-abs
->>> op1 Op.abs "2.1"
-2.1
-
->>> op1 Op.abs "-100"
-100
-
->>> op1 Op.abs "101.5"
-101.5
-
->>> op1 Op.abs "-101.5"
-101.5
--}
-
 -- | 'compare' takes two operands and compares their values numerically. If
 -- either operand is a /special value/ then the general rules apply. No flags
 -- are set unless an operand is a signaling NaN.
@@ -788,26 +583,6 @@ compare Num { } Inf { sign = ys } = return $ case ys of
   Neg -> Right GT
 compare x y = Left <$> generalRules2 x y
 
-{- $doctest-compare
->>> either id fromOrdering $ op2 Op.compare "2.1" "3"
--1
-
->>> either id fromOrdering $ op2 Op.compare "2.1" "2.1"
-0
-
->>> either id fromOrdering $ op2 Op.compare "2.1" "2.10"
-0
-
->>> either id fromOrdering $ op2 Op.compare "3" "2.1"
-1
-
->>> either id fromOrdering $ op2 Op.compare "2.1" "-3"
-1
-
->>> either id fromOrdering $ op2 Op.compare "-3" "2.1"
--1
--}
-
 -- | 'compareSignal' takes two operands and compares their values
 -- numerically. This operation is identical to 'compare', except that if
 -- neither operand is a signaling NaN then any quiet NaN operand is treated as
@@ -830,20 +605,6 @@ compareSignal x y                          = q2s x `compare` q2s y
 max :: Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
 max x y = snd <$> minMax id x y
 
-{- $doctest-max
->>> op2 Op.max "3" "2"
-3
-
->>> op2 Op.max "-10" "3"
-3
-
->>> op2 Op.max "1.0" "1"
-1
-
->>> op2 Op.max "7" "NaN"
-7
--}
-
 -- | 'maxMagnitude' takes two operands and compares their values numerically
 -- with their /sign/ ignored and assumed to be 0.
 --
@@ -860,20 +621,6 @@ maxMagnitude x y = snd <$> minMax withoutSign x y
 -- numeric operand is returned.
 min :: Decimal a b -> Decimal a b -> Arith p r (Decimal a b)
 min x y = fst <$> minMax id x y
-
-{- $doctest-min
->>> op2 Op.min "3" "2"
-2
-
->>> op2 Op.min "-10" "3"
--10
-
->>> op2 Op.min "1.0" "1"
-1.0
-
->>> op2 Op.min "7" "NaN"
-7
--}
 
 -- | 'minMagnitude' takes two operands and compares their values numerically
 -- with their /sign/ ignored and assumed to be 0.
@@ -991,47 +738,6 @@ integralPower b e = integralPower' (return b) e one
           | otherwise = integralPower' (mb >>= \b -> multiply b b) e' r
           where e' = e `div` 2
 
-{- $doctest-power
->>> op2 Op.power "2" "3"
-8
-
->>> op2 Op.power "-2" "3"
--8
-
->>> op2 Op.power "2" "-3"
-0.125
-
->>> op2 Op.power "1.7" "8"
-69.7575744
-
->>> op2 Op.power "10" "0.301029996"
-2.00000000
-
->>> op2 Op.power "Infinity" "-1"
-0
-
->>> op2 Op.power "Infinity" "0"
-1
-
->>> op2 Op.power "Infinity" "1"
-Infinity
-
->>> op2 Op.power "-Infinity" "-1"
--0
-
->>> op2 Op.power "-Infinity" "0"
-1
-
->>> op2 Op.power "-Infinity" "1"
--Infinity
-
->>> op2 Op.power "-Infinity" "2"
-Infinity
-
->>> op2 Op.power "0" "0"
-NaN
--}
-
 -- | 'quantize' takes two operands. If either operand is a /special value/
 -- then the general rules apply, except that if either operand is infinite and
 -- the other is finite an Invalid operation condition is raised and the result
@@ -1078,53 +784,6 @@ quantize Inf{}   Num{} = invalidOperation qNaN
 quantize x@Inf{} Inf{} = return (coerce x)
 quantize x y = generalRules2 x y
 
-{- $doctest-quantize
->>> op2 Op.quantize "2.17" "0.001"
-2.170
-
->>> op2 Op.quantize "2.17" "0.01"
-2.17
-
->>> op2 Op.quantize "2.17" "0.1"
-2.2
-
->>> op2 Op.quantize "2.17" "1e+0"
-2
-
->>> op2 Op.quantize "2.17" "1e+1"
-0E+1
-
->>> op2 Op.quantize "-Inf" "Infinity"
--Infinity
-
->>> op2 Op.quantize "2" "Infinity"
-NaN
-
->>> op2 Op.quantize "-0.1" "1"
--0
-
->>> op2 Op.quantize "-0" "1e+5"
--0E+5
-
->>> op2 Op.quantize "+35236450.6" "1e-2"
-NaN
-
->>> op2 Op.quantize "-35236450.6" "1e-2"
-NaN
-
->>> op2 Op.quantize "217" "1e-1"
-217.0
-
->>> op2 Op.quantize "217" "1e+0"
-217
-
->>> op2 Op.quantize "217" "1e+1"
-2.2E+2
-
->>> op2 Op.quantize "217" "1e+2"
-2E+2
--}
-
 -- | 'reduce' takes one operand. It has the same semantics as the 'plus'
 -- operation, except that if the final result is finite it is reduced to its
 -- simplest form, with all trailing zeros removed and its sign preserved.
@@ -1135,26 +794,6 @@ reduce n = reduce' <$> plus n
           | r == 0 = reduce' n { coefficient = q, exponent = e + 1 }
           where (q, r) = c `quotRem` 10
         reduce' n = n
-
-{- $doctest-reduce
->>> op1 Op.reduce "2.1"
-2.1
-
->>> op1 Op.reduce "-2.0"
--2
-
->>> op1 Op.reduce "1.200"
-1.2
-
->>> op1 Op.reduce "-120"
--1.2E+2
-
->>> op1 Op.reduce "120.00"
-1.2E+2
-
->>> op1 Op.reduce "0.00"
-0
--}
 
 -- | 'roundToIntegralExact' takes one operand. If the operand is a
 -- /special value/, or the exponent of the operand is non-negative, then the
@@ -1184,32 +823,6 @@ roundToIntegralExact x@Num { exponent = e }
 
 roundToIntegralExact x@Inf{} = return (coerce x)
 roundToIntegralExact x = coerce <$> generalRules1 x
-
-{- $doctest-roundToIntegralExact
->>> op1 Op.roundToIntegralExact "2.1"
-2
-
->>> op1 Op.roundToIntegralExact "100"
-100
-
->>> op1 Op.roundToIntegralExact "100.0"
-100
-
->>> op1 Op.roundToIntegralExact "101.5"
-102
-
->>> op1 Op.roundToIntegralExact "-101.5"
--102
-
->>> op1 Op.roundToIntegralExact "10E+5"
-1.0E+6
-
->>> op1 Op.roundToIntegralExact "7.89E+77"
-7.89E+77
-
->>> op1 Op.roundToIntegralExact "-Inf"
--Infinity
--}
 
 -- | 'roundToIntegralValue' takes one operand. It is identical to the
 -- 'roundToIntegralExact' operation except that the 'Inexact' and 'Rounded'
@@ -1297,37 +910,6 @@ squareRoot n@Num { sign = s, coefficient = c, exponent = e }
 squareRoot n@Inf { sign = Pos } = return (coerce n)
 squareRoot x = coerce <$> generalRules1 x
 
-{- $doctest-squareRoot
->>> op1 Op.squareRoot "0"
-0
-
->>> op1 Op.squareRoot "-0"
--0
-
-The following example is a corrected version of that found in the
-specification; confirmed with Mike Cowlishaw on 2016-08-02.
->>> op1 Op.squareRoot "0.39"
-0.624499800
-
->>> op1 Op.squareRoot "100"
-10
-
->>> op1 Op.squareRoot "1"
-1
-
->>> op1 Op.squareRoot "1.0"
-1.0
-
->>> op1 Op.squareRoot "1.00"
-1.0
-
->>> op1 Op.squareRoot "7"
-2.64575131
-
->>> op1 Op.squareRoot "10"
-3.16227766
--}
-
 -- $miscellaneous-operations
 --
 -- This section describes miscellaneous operations on decimal numbers,
@@ -1396,26 +978,6 @@ and x@Num{} y@Num{} = case (toLogical x, toLogical y) of
   _ -> invalidOperation qNaN
 and x y = generalRules2 x y
 
-{- $doctest-and
->>> op2 Op.and "0" "0"
-0
-
->>> op2 Op.and "0" "1"
-0
-
->>> op2 Op.and "1" "0"
-0
-
->>> op2 Op.and "1" "1"
-1
-
->>> op2 Op.and "1100" "1010"
-1000
-
->>> op2 Op.and "1111" "10"
-10
--}
-
 -- | 'or' is a logical operation which takes two logical operands. The result
 -- is the digit-wise /inclusive or/ of the two operands; each digit of the
 -- result is the logical or of the corresponding digits of the operands,
@@ -1430,26 +992,6 @@ or x@Num{} y@Num{} = case (toLogical x, toLogical y) of
     in return (fromLogical z)
   _ -> invalidOperation qNaN
 or x y = generalRules2 x y
-
-{- $doctest-or
->>> op2 Op.or "0" "0"
-0
-
->>> op2 Op.or "0" "1"
-1
-
->>> op2 Op.or "1" "0"
-1
-
->>> op2 Op.or "1" "1"
-1
-
->>> op2 Op.or "1100" "1010"
-1110
-
->>> op2 Op.or "1110" "10"
-1110
--}
 
 -- | 'xor' is a logical operation which takes two logical operands. The result
 -- is the digit-wise /exclusive or/ of the two operands; each digit of the
@@ -1467,26 +1009,6 @@ xor x@Num{} y@Num{} = case (toLogical x, toLogical y) of
   _ -> invalidOperation qNaN
 xor x y = generalRules2 x y
 
-{- $doctest-xor
->>> op2 Op.xor "0" "0"
-0
-
->>> op2 Op.xor "0" "1"
-1
-
->>> op2 Op.xor "1" "0"
-1
-
->>> op2 Op.xor "1" "1"
-0
-
->>> op2 Op.xor "1100" "1010"
-110
-
->>> op2 Op.xor "1111" "10"
-1101
--}
-
 -- | 'invert' is a logical operation which takes one logical operand. The
 -- result is the digit-wise /inversion/ of the operand; each digit of the
 -- result is the inverse of the corresponding digit of the operand. A result
@@ -1498,20 +1020,6 @@ invert x@Num{} = case toLogical x of
     in return (fromLogical z)
   _ -> invalidOperation qNaN
 invert x = generalRules1 x
-
-{- $doctest-invert
->>> op1 Op.invert "0"
-111111111
-
->>> op1 Op.invert "1"
-111111110
-
->>> op1 Op.invert "111111111"
-0
-
->>> op1 Op.invert "101010101"
-10101010
--}
 
 -- | 'canonical' takes one operand. The result has the same value as the
 -- operand but always uses a /canonical/ encoding. The definition of
@@ -1526,11 +1034,6 @@ invert x = generalRules1 x
 -- no /flags/ are changed in the context.
 canonical :: Decimal a b -> Arith p r (Decimal a b)
 canonical = copy
-
-{- $doctest-canonical
->>> op1 Op.canonical "2.50"
-2.50
--}
 
 -- | 'class'' takes one operand. The result is an indication of the /class/ of
 -- the operand, where the class is one of ten possibilities, corresponding to
@@ -1586,47 +1089,6 @@ instance Show Class where
           nan :: String
           nan = "NaN"
 
-{- $doctest-class'
->>> op1 Op.class' "Infinity"
-+Infinity
-
->>> op1 Op.class' "1E-10"
-+Normal
-
->>> op1 Op.class' "2.50"
-+Normal
-
->>> op1 Op.class' "0.1E-999"
-+Subnormal
-
->>> op1 Op.class' "0"
-+Zero
-
->>> op1 Op.class' "-0"
--Zero
-
->>> op1 Op.class' "-0.1E-999"
--Subnormal
-
->>> op1 Op.class' "-1E-10"
--Normal
-
->>> op1 Op.class' "-2.50"
--Normal
-
->>> op1 Op.class' "-Infinity"
--Infinity
-
->>> op1 Op.class' "NaN"
-NaN
-
->>> op1 Op.class' "-NaN"
-NaN
-
->>> op1 Op.class' "sNaN"
-sNaN
--}
-
 -- | 'compareTotal' takes two operands and compares them using their abstract
 -- representation rather than their numerical value. A /total ordering/ is
 -- defined for all possible abstract representations, as described below. If
@@ -1678,26 +1140,6 @@ compareTotal x y = return $ case (sign x, sign y) of
         compareAbs NaN{} _     = GT
         compareAbs _     NaN{} = LT
 
-{- $doctest-compareTotal
->>> fromOrdering $ op2 Op.compareTotal "12.73" "127.9"
--1
-
->>> fromOrdering $ op2 Op.compareTotal "-127" "12"
--1
-
->>> fromOrdering $ op2 Op.compareTotal "12.30" "12.3"
--1
-
->>> fromOrdering $ op2 Op.compareTotal "12.30" "12.30"
-0
-
->>> fromOrdering $ op2 Op.compareTotal "12.3" "12.300"
-1
-
->>> fromOrdering $ op2 Op.compareTotal "12.3" "NaN"
--1
--}
-
 -- | 'compareTotalMagnitude' takes two operands and compares them using their
 -- abstract representation rather than their numerical value and with their
 -- /sign/ ignored and assumed to be 0. The result is identical to that
@@ -1712,27 +1154,11 @@ compareTotalMagnitude x y = compareTotal x { sign = Pos } y { sign = Pos }
 copy :: Decimal a b -> Arith p r (Decimal a b)
 copy = return
 
-{- $doctest-copy
->>> op1 Op.copy "2.1"
-2.1
-
->>> op1 Op.copy "-1.00"
--1.00
--}
-
 -- | 'copyAbs' takes one operand. The result is a copy of the operand with the
 -- /sign/ set to 0. Unlike the 'abs' operation, this operation is unaffected
 -- by context and is quiet — no /flags/ are changed in the context.
 copyAbs :: Decimal a b -> Arith p r (Decimal a b)
 copyAbs n = return n { sign = Pos }
-
-{- $doctest-copyAbs
->>> op1 Op.copyAbs "2.1"
-2.1
-
->>> op1 Op.copyAbs "-100"
-100
--}
 
 -- | 'copyNegate' takes one operand. The result is a copy of the operand with
 -- the /sign/ inverted (a /sign/ of 0 becomes 1 and vice versa). Unlike the
@@ -1741,34 +1167,12 @@ copyAbs n = return n { sign = Pos }
 copyNegate :: Decimal a b -> Arith p r (Decimal a b)
 copyNegate n = return n { sign = negateSign (sign n) }
 
-{- $doctest-copyNegate
->>> op1 Op.copyNegate "101.5"
--101.5
-
->>> op1 Op.copyNegate "-101.5"
-101.5
--}
-
 -- | 'copySign' takes two operands. The result is a copy of the first operand
 -- with the /sign/ set to be the same as the /sign/ of the second
 -- operand. This operation is unaffected by context and is quiet — no /flags/
 -- are changed in the context.
 copySign :: Decimal a b -> Decimal c d -> Arith p r (Decimal a b)
 copySign n m = return n { sign = sign m }
-
-{- $doctest-copySign
->>> op2 Op.copySign  "1.50"  "7.33"
-1.50
-
->>> op2 Op.copySign "-1.50"  "7.33"
-1.50
-
->>> op2 Op.copySign  "1.50" "-7.33"
--1.50
-
->>> op2 Op.copySign "-1.50" "-7.33"
--1.50
--}
 
 -- | 'isCanonical' takes one operand. The result is 'True' if the operand is
 -- /canonical/; otherwise it is 'False'. The definition of /canonical/ is
@@ -1783,34 +1187,12 @@ copySign n m = return n { sign = sign m }
 isCanonical :: Decimal a b -> Arith p r Bool
 isCanonical _ = return True
 
-{- $doctest-isCanonical
->>> fromBool $ op1 Op.isCanonical "2.50"
-1
--}
-
 -- | 'isFinite' takes one operand. The result is 'True' if the operand is
 -- neither infinite nor a NaN (that is, it is a normal number, a subnormal
 -- number, or a zero); otherwise it is 'False'. This operation is unaffected
 -- by context and is quiet — no /flags/ are changed in the context.
 isFinite :: Decimal a b -> Arith p r Bool
 isFinite = return . Number.isFinite
-
-{- $doctest-isFinite
->>> fromBool $ op1 Op.isFinite "2.50"
-1
-
->>> fromBool $ op1 Op.isFinite "-0.3"
-1
-
->>> fromBool $ op1 Op.isFinite "0"
-1
-
->>> fromBool $ op1 Op.isFinite "Inf"
-0
-
->>> fromBool $ op1 Op.isFinite "NaN"
-0
--}
 
 -- | 'isInfinite' takes one operand. The result is 'True' if the operand is an
 -- Infinity; otherwise it is 'False'. This operation is unaffected by context
@@ -1820,17 +1202,6 @@ isInfinite n = return $ case n of
   Inf{} -> True
   _     -> False
 
-{- $doctest-isInfinite
->>> fromBool $ op1 Op.isInfinite "2.50"
-0
-
->>> fromBool $ op1 Op.isInfinite "-Inf"
-1
-
->>> fromBool $ op1 Op.isInfinite "NaN"
-0
--}
-
 -- | 'isNaN' takes one operand. The result is 'True' if the operand is a NaN
 -- (quiet or signaling); otherwise it is 'False'. This operation is unaffected
 -- by context and is quiet — no /flags/ are changed in the context.
@@ -1839,39 +1210,11 @@ isNaN n = return $ case n of
   NaN{} -> True
   _     -> False
 
-{- $doctest-isNaN
->>> fromBool $ op1 Op.isNaN "2.50"
-0
-
->>> fromBool $ op1 Op.isNaN "NaN"
-1
-
->>> fromBool $ op1 Op.isNaN "-sNaN"
-1
--}
-
 -- | 'isNormal' takes one operand. The result is 'True' if the operand is a
 -- positive or negative /normal number/; otherwise it is 'False'. This
 -- operation is quiet; no /flags/ are changed in the context.
 isNormal :: Precision a => Decimal a b -> Arith p r Bool
 isNormal = return . Number.isNormal
-
-{- $doctest-isNormal
->>> fromBool $ op1 Op.isNormal "2.50"
-1
-
->>> fromBool $ op1 Op.isNormal "0.1E-999"
-0
-
->>> fromBool $ op1 Op.isNormal "0.00"
-0
-
->>> fromBool $ op1 Op.isNormal "-Inf"
-0
-
->>> fromBool $ op1 Op.isNormal "NaN"
-0
--}
 
 -- | 'isQNaN' takes one operand. The result is 'True' if the operand is a
 -- quiet NaN; otherwise it is 'False'. This operation is unaffected by context
@@ -1881,33 +1224,11 @@ isQNaN n = return $ case n of
   NaN { signaling = False } -> True
   _                         -> False
 
-{- $doctest-isQNaN
->>> fromBool $ op1 Op.isQNaN "2.50"
-0
-
->>> fromBool $ op1 Op.isQNaN "NaN"
-1
-
->>> fromBool $ op1 Op.isQNaN "sNaN"
-0
--}
-
 -- | 'isSigned' takes one operand. The result is 'True' if the /sign/ of the
 -- operand is 1; otherwise it is 'False'. This operation is unaffected by
 -- context and is quiet — no /flags/ are changed in the context.
 isSigned :: Decimal a b -> Arith p r Bool
 isSigned = return . Number.isNegative
-
-{- $doctest-isSigned
->>> fromBool $ op1 Op.isSigned "2.50"
-0
-
->>> fromBool $ op1 Op.isSigned "-12"
-1
-
->>> fromBool $ op1 Op.isSigned "-0"
-1
--}
 
 -- | 'isSNaN' takes one operand. The result is 'True' if the operand is a
 -- signaling NaN; otherwise it is 'False'. This operation is unaffected by
@@ -1917,56 +1238,17 @@ isSNaN n = return $ case n of
   NaN { signaling = True } -> True
   _                        -> False
 
-{- $doctest-isSNaN
->>> fromBool $ op1 Op.isSNaN "2.50"
-0
-
->>> fromBool $ op1 Op.isSNaN "NaN"
-0
-
->>> fromBool $ op1 Op.isSNaN "sNaN"
-1
--}
-
 -- | 'isSubnormal' takes one operand. The result is 'True' if the operand is a
 -- positive or negative /subnormal number/; otherwise it is 'False'. This
 -- operation is quiet; no /flags/ are changed in the context.
 isSubnormal :: Precision a => Decimal a b -> Arith p r Bool
 isSubnormal = return . Number.isSubnormal
 
-{- $doctest-isSubnormal
->>> fromBool $ op1 Op.isSubnormal "2.50"
-0
-
->>> fromBool $ op1 Op.isSubnormal "0.1E-999"
-1
-
->>> fromBool $ op1 Op.isSubnormal "0.00"
-0
-
->>> fromBool $ op1 Op.isSubnormal "-Inf"
-0
-
->>> fromBool $ op1 Op.isSubnormal "NaN"
-0
--}
-
 -- | 'isZero' takes one operand. The result is 'True' if the operand is a
 -- zero; otherwise it is 'False'. This operation is unaffected by context and
 -- is quiet — no /flags/ are changed in the context.
 isZero :: Decimal a b -> Arith p r Bool
 isZero = return . Number.isZero
-
-{- $doctest-isZero
->>> fromBool $ op1 Op.isZero "0"
-1
-
->>> fromBool $ op1 Op.isZero "2.50"
-0
-
->>> fromBool $ op1 Op.isZero "-0E+2"
-1
--}
 
 -- | 'logb' takes one operand. If the operand is a NaN then the general
 -- arithmetic rules apply. If the operand is infinite then +Infinity is
@@ -1985,20 +1267,6 @@ logb Num { coefficient = c, exponent = e }
   where r = fromIntegral (numDigits c) - 1 + fromIntegral e :: Integer
 logb Inf{} = return Inf { sign = Pos }
 logb x = generalRules1 x
-
-{- $doctest-logb
->>> op1 Op.logb "250"
-2
-
->>> op1 Op.logb "2.50"
-0
-
->>> op1 Op.logb "0.03"
--2
-
->>> op1 Op.logb "0"
--Infinity
--}
 
 -- | 'scaleb' takes two operands. If either operand is a NaN then the general
 -- arithmetic rules apply. Otherwise, the second operand must be a finite
@@ -2022,17 +1290,6 @@ validScale :: Decimal a b -> Bool
 validScale Num { exponent = 0 } = True  -- XXX
 validScale _                    = False
 
-{- $doctest-scaleb
->>> op2 Op.scaleb "7.50" "-2"
-0.0750
-
->>> op2 Op.scaleb "7.50" "0"
-7.50
-
->>> op2 Op.scaleb "7.50" "3"
-7.50E+3
--}
-
 -- | 'radix' takes no operands. The result is the radix (base) in which
 -- arithmetic is effected; for this specification the result will have the
 -- value 10.
@@ -2041,11 +1298,6 @@ radix = return radix'
   where radix' = case precision radix' of
           Just 1 -> one { exponent    =  1 }
           _      -> one { coefficient = 10 }
-
-{- $doctest-radix
->>> op0 Op.radix
-10
--}
 
 -- | 'sameQuantum' takes two operands, and returns 'True' if the two operands
 -- have the same /exponent/ or 'False' otherwise. The result is never affected
@@ -2060,26 +1312,6 @@ sameQuantum Num { exponent = xe } Num { exponent = ye } = return (xe == ye)
 sameQuantum Inf {               } Inf {               } = return True
 sameQuantum NaN {               } NaN {               } = return True
 sameQuantum _                     _                     = return False
-
-{- $doctest-sameQuantum
->>> fromBool $ op2 Op.sameQuantum "2.17" "0.001"
-0
-
->>> fromBool $ op2 Op.sameQuantum "2.17" "0.01"
-1
-
->>> fromBool $ op2 Op.sameQuantum "2.17" "0.1"
-0
-
->>> fromBool $ op2 Op.sameQuantum "2.17" "1"
-0
-
->>> fromBool $ op2 Op.sameQuantum "Inf" "-Inf"
-1
-
->>> fromBool $ op2 Op.sameQuantum "NaN" "NaN"
-1
--}
 
 -- | 'shift' takes two operands. The second operand must be an integer (with
 -- an /exponent/ of 0) in the range /−precision/ through /precision/. If the
@@ -2119,23 +1351,6 @@ validShift :: Precision p => p -> Decimal a b -> Bool
 validShift px Num { coefficient = c, exponent = 0 } =
   let p = fromIntegral <$> precision px in maybe True (c <=) p
 validShift _ _ = False
-
-{- $doctest-shift
->>> op2 Op.shift "34" "8"
-400000000
-
->>> op2 Op.shift "12" "9"
-0
-
->>> op2 Op.shift "123456789" "-2"
-1234567
-
->>> op2 Op.shift "123456789" "0"
-123456789
-
->>> op2 Op.shift "123456789" "+2"
-345678900
--}
 
 -- | 'rotate' takes two operands. The second operand must be an integer (with
 -- an /exponent/ of 0) in the range /−precision/ through /precision/. If the
@@ -2177,20 +1392,3 @@ rotate n@NaN { signaling = False } s | validShift z s = return z
   where z = coerce n
 rotate n@NaN { signaling = True  } _                  = invalidOperation n
 rotate _                           s                  = invalidOperation s
-
-{- $doctest-rotate
->>> op2 Op.rotate "34" "8"
-400000003
-
->>> op2 Op.rotate "12" "9"
-12
-
->>> op2 Op.rotate "123456789" "-2"
-891234567
-
->>> op2 Op.rotate "123456789" "0"
-123456789
-
->>> op2 Op.rotate "123456789" "+2"
-345678912
--}
