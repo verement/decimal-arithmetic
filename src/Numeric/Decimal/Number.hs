@@ -268,6 +268,17 @@ infiniteSeries op ~(x:xs) = series x xs
           where n' = n `op` x
         series n []   = n
 
+-- | Compute the arctangent of the argument to maximum precision using series
+-- expansion.
+arctangent :: (FinitePrecision p, Rounding r) => Decimal p r -> Decimal p r
+arctangent x = infiniteSeries (+) (x : series True three x)
+  where series neg d x =
+          let x' = x * x2
+              n | neg       = flipSign x'
+                | otherwise = x'
+          in (n / d) : series (not neg) (d + two) x'
+        x2 = x * x
+
 -- | Compute the arcsine of the argument to maximum precision using series
 -- expansion.
 arcsine :: (FinitePrecision p, Rounding r) => Decimal p r -> Decimal p r
@@ -285,6 +296,50 @@ seriesPi = 6 * arcsine oneHalf
 fastPi :: FinitePrecision p => Decimal p RoundHalfEven
 fastPi = 3.1415926535897932384626433832795028841971693993751
 
+-- | Compute (cos 𝛽, sin 𝛽) to maximum precision using Volder's algorithm
+-- (CORDIC).
+cordic :: (FinitePrecision p, Rounding r)
+       => Decimal p r -> (Decimal p r, Decimal p r)
+cordic beta@Num{}
+  | beta >    halfPi = negatePair $ cordic (beta - pi)
+  | beta < negHalfPi = negatePair $ cordic (beta + pi)
+  | isZero beta      = (one, zero)
+  | otherwise        = cordic' beta (one, zero) one angles
+
+  where halfPi    = pi * oneHalf
+        negHalfPi = flipSign halfPi
+        quarterPi = halfPi * oneHalf
+        negatePair (x, y) = (flipSign x, flipSign y)
+
+        angles = quarterPi : [ arctangent x | x <- iterate (* oneHalf) oneHalf ]
+
+        cordic' beta v@(x, y) powerOfTwo ~(angle:angles)
+          | v' == v   = (k * x, k * y)
+          | otherwise = cordic' beta' v' powerOfTwo' angles
+          where beta'  | isNegative beta = beta + angle
+                       | otherwise       = beta - angle
+                factor | isNegative beta = powerOfTwo { sign = Neg }
+                       | otherwise       = powerOfTwo
+                v' = (x - factor * y, factor * x + y)
+                powerOfTwo' = powerOfTwo * oneHalf
+
+        -- K = lim {n→∞} K(n)
+        -- K(n) = prod {i=0..n-1} 1 / sqrt (1 + 2^(-2 * i))
+        k | p <= 50   = fastK
+          | otherwise = seriesK
+          where Just p  = precision k
+                fastK   = 0.60725293500888125616944675250492826311239085215009
+                seriesK = infiniteSeries (*)
+                  [ recip $ sqrt (one + x) | x <- iterate (* oneQuarter) one ]
+                oneQuarter = oneHalf * oneHalf
+
+cordic _ = (qNaN, qNaN)
+
+-- | Cast a number to a number with two additional digits of precision.
+castUp :: Precision p
+       => Decimal p a -> Decimal (PPlus1 (PPlus1 p)) RoundHalfEven
+castUp = coerce
+
 -- | Cast a number with two additional digits of precision down to a number
 -- with the desired precision.
 castDown :: Precision p
@@ -294,8 +349,8 @@ castDown = cast
 notyet :: String -> a
 notyet = error . (++ ": not yet implemented")
 
--- | The trigonometric 'Floating' methods (other than the precision-dependent
--- constant 'pi') are not yet implemented.
+-- | The trigonometric 'Floating' methods 'asin', 'acos', and 'atan' are not
+-- yet implemented. The constant 'pi' is precision-dependent.
 instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   pi = castRounding pi'
     where pi' | p <= 50   = fastPi
@@ -318,9 +373,9 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
 
   sqrt = castRounding . evalOp . Op.squareRoot
 
-  sin  = notyet "sin"
-  cos  = notyet "cos"
-  tan  = notyet "tan"
+  sin  = castRounding . castDown . snd                . cordic . castUp
+  cos  = castRounding . castDown . fst                . cordic . castUp
+  tan  = castRounding . castDown . uncurry (flip (/)) . cordic . castUp
 
   asin = notyet "asin"
   acos = notyet "acos"
