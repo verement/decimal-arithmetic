@@ -259,18 +259,19 @@ instance (FinitePrecision p, Rounding r) => RealFrac (Decimal p r) where
 
 -- | Compute an infinite series to maximum precision.
 infiniteSeries :: (FinitePrecision p, Rounding r)
-               => [Decimal p r] -> Decimal p r
-infiniteSeries = series zero
+               => (Decimal p r -> Decimal p r -> Decimal p r)
+               -> [Decimal p r] -> Decimal p r
+infiniteSeries op ~(x:xs) = series x xs
   where series n (x:xs)
           | n' == n   = n'
           | otherwise = series n' xs
-          where n' = n + x
+          where n' = n `op` x
         series n []   = n
 
 -- | Compute the arcsine of the argument to maximum precision using series
 -- expansion.
 arcsine :: (FinitePrecision p, Rounding r) => Decimal p r -> Decimal p r
-arcsine x = infiniteSeries (x : series 1 2 x 3)
+arcsine x = infiniteSeries (+) (x : series one two x three)
   where series n d x i =
           let x' = x * x2
           in (n * x') / (d * i) : series (n * i) (d * (i + one)) x' (i + two)
@@ -468,6 +469,10 @@ one = zero { coefficient = 1 }
 -- | A 'Decimal' representing the value two
 two :: Decimal p r
 two = zero { coefficient = 2 }
+
+-- | A 'Decimal' representing the value three
+three :: Decimal p r
+three = zero { coefficient = 3 }
 
 -- | A 'Decimal' representing the value ten
 ten :: Decimal p r
