@@ -257,10 +257,35 @@ instance (FinitePrecision p, Rounding r) => RealFrac (Decimal p r) where
           (q, r) = c `quotRem` (10^(-e))
   properFraction nan = (0, nan)
 
+-- | Compute a generalized continued fraction to maximum precision. A hint is
+-- used to indicate the minimum number of terms that should be generated
+-- before (expensively) examining the results for convergence.
+continuedFraction :: FinitePrecision p
+                  => Int -> Integer -> [(Integer, Integer)] -> ExtendedDecimal p
+continuedFraction m b0 ((a1, b1) : ps) = convergent (max 0 $ m - 2) x0 x1 x1' ps
+  where x0  = (aa0, bb0)
+        x1  = (aa1, bb1)
+        x1' = fromRational (aa1 % bb1)
+        aa0 = b0
+        bb0 = 1
+        aa1 = b1 * b0 + a1
+        bb1 = b1
+
+        convergent m (aa0, bb0) x1@(aa1, bb1) x1' ((a2, b2) : ps)
+          | m == 0 && x2' == x1' = x2'
+          | otherwise            = convergent (max 0 $ m - 1) x1 x2 x2' ps
+          where x2  = (aa2, bb2)
+                x2' = fromRational (aa2 % bb2)
+                aa2 = b2 * aa1 + a2 * aa0
+                bb2 = b2 * bb1 + a2 * bb0
+        convergent _ _ _ x [] = x
+
+continuedFraction _ b0 [] = fromInteger b0
+
 -- | Compute an infinite series to maximum precision.
-infiniteSeries :: (FinitePrecision p, Rounding r)
-               => (Decimal p r -> Decimal p r -> Decimal p r)
-               -> [Decimal p r] -> Decimal p r
+infiniteSeries :: FinitePrecision p
+               => (ExtendedDecimal p -> ExtendedDecimal p -> ExtendedDecimal p)
+               -> [ExtendedDecimal p] -> ExtendedDecimal p
 infiniteSeries op ~(x:xs) = series x xs
   where series n (x:xs)
           | n' == n   = n'
@@ -268,58 +293,114 @@ infiniteSeries op ~(x:xs) = series x xs
           where n' = n `op` x
         series n []   = n
 
--- | Compute the arctangent of the argument to maximum precision using series
--- expansion.
-arctangent :: (FinitePrecision p, Rounding r) => Decimal p r -> Decimal p r
-arctangent x = infiniteSeries (+) (x : series True three x)
-  where series neg d x =
-          let x' = x * x2
-              n | neg       = flipSign x'
-                | otherwise = x'
-          in (n / d) : series (not neg) (d + two) x'
-        x2 = x * x
+-- | Compute the inverse tangent of the argument to maximum precision using
+-- series expansion.
+seriesArctan :: FinitePrecision p => Decimal p r -> ExtendedDecimal p
+seriesArctan z = infiniteSeries (+) (z' : series True three z')
+  where series neg d z =
+          let z' = z * z2
+              n | neg       = flipSign z'
+                | otherwise = z'
+          in (n / d) : series (not neg) (d + two) z'
+        z' = castRounding z
+        z2 = z' * z'
 
--- | Compute the arcsine of the argument to maximum precision using series
--- expansion.
-arcsine :: (FinitePrecision p, Rounding r) => Decimal p r -> Decimal p r
-arcsine x = infiniteSeries (+) (x : series one two x three)
-  where series n d x i =
-          let x' = x * x2
-          in (n * x') / (d * i) : series (n * i) (d * (i + one)) x' (i + two)
-        x2 = x * x
+-- | Compute the inverse sine of the argument to maximum precision using
+-- series expansion.
+seriesArcsin :: FinitePrecision p => Decimal p r -> ExtendedDecimal p
+seriesArcsin z = infiniteSeries (+) (z' : series one two z' three)
+  where series n d z i =
+          let z' = z * z2
+          in (n * z') / (d * i) : series (n * i) (d * (i + one)) z' (i + two)
+        z' = castRounding z
+        z2 = z' * z'
 
--- | Compute π to maximum precision using the arcsine series expansion.
-seriesPi :: FinitePrecision p => Decimal p RoundHalfEven
-seriesPi = 6 * arcsine oneHalf
+-- | Compute the inverse tangent of the (decimal) argument to maximum
+-- precision.
+arctan :: (FinitePrecision p, Rounding r) => Decimal p r -> ExtendedDecimal p
+arctan z@Num {          } = arctan' (toRational z)
+arctan   Inf { sign = s } = signFunc s halfPi
+arctan   _                = qNaN
+
+-- | Compute the inverse tangent of the (rational) argument to maximum
+-- precision using a generalized continued fraction.
+arctan' :: FinitePrecision p => Rational -> ExtendedDecimal p
+arctan' z = continuedFraction m 0 $ (x, y) : partials 1 0 y
+  where x = numerator   z
+        y = denominator z
+        m = fromInteger $ (42 * abs x) `div` y  -- estimated minimum # terms
+
+        x2 = x * x
+        ty = 2 * y
+
+        -- [ (nx * nx, (n * 2 + 1) * y) | n <- [1..], let nx = n * x ]
+        partials n a b =
+          let a' = a + n * x2
+              b' = b +     ty
+          in (a', b') : partials (n + 2) a' b'
+
+-- | Compute the inverse sine of the argument to maximum precision.
+arcsin :: FinitePrecision p => Decimal p r -> ExtendedDecimal p
+arcsin z = let z' = castUp z
+           in castDown' $ two * arctan (z' / (one + sqrt (one - z' * z')))
+
+-- | Compute the inverse cosine of the argument to maximum precision.
+arccos :: FinitePrecision p => Decimal p r -> ExtendedDecimal p
+arccos = castDown' . (halfPi -) . arcsin . castUp
+
+-- | Compute π to maximum precision using the inverse sine series expansion.
+seriesPi :: FinitePrecision p => ExtendedDecimal p
+seriesPi = castDown' $ 6 * arcsin oneHalf
+
+-- | Compute π to maximum precision using the best-known Machin-like formula.
+machinPi :: FinitePrecision p => ExtendedDecimal p
+machinPi = castDown' $ 16 * arctan' (1 % 5) - 4 * arctan' (1 % 239)
+
+-- | Compute π to maximum precision using a generalized continued fraction
+-- that converges linearly, adding at least three decimal digits of precision
+-- per four terms.
+cfPi :: FinitePrecision p => ExtendedDecimal p
+cfPi = pi'
+  where pi'    = continuedFraction m
+                 0 $ (4, 1) : [ (n * n, n * 2 + 1) | n <- [1..] ]
+        Just p = precision pi'
+        m      = (p `div` 3) * 4
 
 -- | Precomputed π to a precision of 50 digits
-fastPi :: FinitePrecision p => Decimal p RoundHalfEven
+fastPi :: FinitePrecision p => ExtendedDecimal p
 fastPi = 3.1415926535897932384626433832795028841971693993751
+
+-- | Compute π/2 to maximum precision.
+halfPi :: FinitePrecision p => ExtendedDecimal p
+halfPi = castDown' $ pi * oneHalf
+
+-- | Compute π/4 to maximum precision.
+quarterPi :: FinitePrecision p => ExtendedDecimal p
+quarterPi = castDown' $ pi * oneQuarter
 
 -- | Compute (cos 𝛽, sin 𝛽) to maximum precision using Volder's algorithm
 -- (CORDIC).
-cordic :: (FinitePrecision p, Rounding r)
-       => Decimal p r -> (Decimal p r, Decimal p r)
+cordic :: FinitePrecision p
+       => ExtendedDecimal p -> (ExtendedDecimal p, ExtendedDecimal p)
 cordic beta@Num{}
-  | beta >    halfPi = negatePair $ cordic (beta - pi)
-  | beta < negHalfPi = negatePair $ cordic (beta + pi)
-  | isZero beta      = (one, zero)
-  | otherwise        = cordic' beta (one, zero) one angles
+  | beta >          halfPi = negatePair $ cordic (beta - pi)
+  | beta < flipSign halfPi = negatePair $ cordic (beta + pi)
+  | isZero beta            = (one, zero)
+  | otherwise              = cordic' beta (one, zero) one angles
 
-  where halfPi    = pi * oneHalf
-        negHalfPi = flipSign halfPi
-        quarterPi = halfPi * oneHalf
-        negatePair (x, y) = (flipSign x, flipSign y)
+  where negatePair (x, y) = (flipSign x, flipSign y)
 
-        angles = quarterPi : [ arctangent x | x <- iterate (* oneHalf) oneHalf ]
+        angles = quarterPi : [ arctan' z | let half = 1 % 2
+                                         , z <- iterate (* half) half ]
 
         cordic' beta v@(x, y) powerOfTwo ~(angle:angles)
           | v' == v   = (k * x, k * y)
           | otherwise = cordic' beta' v' powerOfTwo' angles
-          where beta'  | isNegative beta = beta + angle
-                       | otherwise       = beta - angle
-                factor | isNegative beta = powerOfTwo { sign = Neg }
-                       | otherwise       = powerOfTwo
+          where isNegBeta = isNegative beta
+                beta'  | isNegBeta = beta + angle
+                       | otherwise = beta - angle
+                factor | isNegBeta = powerOfTwo { sign = Neg }
+                       | otherwise = powerOfTwo
                 v' = (x - factor * y, factor * x + y)
                 powerOfTwo' = powerOfTwo * oneHalf
 
@@ -331,30 +412,32 @@ cordic beta@Num{}
                 fastK   = 0.60725293500888125616944675250492826311239085215009
                 seriesK = infiniteSeries (*)
                   [ recip $ sqrt (one + x) | x <- iterate (* oneQuarter) one ]
-                oneQuarter = oneHalf * oneHalf
 
 cordic _ = (qNaN, qNaN)
 
--- | Cast a number to a number with two additional digits of precision.
-castUp :: Precision p
-       => Decimal p a -> Decimal (PPlus1 (PPlus1 p)) RoundHalfEven
+-- | Cast a number to a number with two additional digits of precision and
+-- rounding half even.
+castUp :: Precision p => Decimal p r -> ExtendedDecimal (PPlus1 (PPlus1 p))
 castUp = coerce
 
 -- | Cast a number with two additional digits of precision down to a number
--- with the desired precision.
-castDown :: Precision p
-         => Decimal (PPlus1 (PPlus1 p)) a -> Decimal p RoundHalfEven
-castDown = cast
+-- with the desired precision, rounding half even.
+castDown' :: Precision p
+          => ExtendedDecimal (PPlus1 (PPlus1 p)) -> ExtendedDecimal p
+castDown' = cast
 
-notyet :: String -> a
-notyet = error . (++ ": not yet implemented")
+-- | Cast a number with two additional digits of precision down to a number
+-- with the desired precision, rounding half even, but returning a number type
+-- with arbitrary rounding.
+castDown :: (Precision p, Rounding r)
+         => ExtendedDecimal (PPlus1 (PPlus1 p)) -> Decimal p r
+castDown = castRounding . castDown'
 
--- | The trigonometric 'Floating' methods 'asin', 'acos', and 'atan' are not
--- yet implemented. The constant 'pi' is precision-dependent.
+-- | The constant 'pi' is precision-dependent.
 instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
   pi = castRounding pi'
     where pi' | p <= 50   = fastPi
-              | otherwise = castDown seriesPi
+              | otherwise = cfPi
           Just p = precision pi'
 
   exp = castRounding . evalOp . Op.exp
@@ -373,35 +456,35 @@ instance (FinitePrecision p, Rounding r) => Floating (Decimal p r) where
 
   sqrt = castRounding . evalOp . Op.squareRoot
 
-  sin  = castRounding . castDown . snd                . cordic . castUp
-  cos  = castRounding . castDown . fst                . cordic . castUp
-  tan  = castRounding . castDown . uncurry (flip (/)) . cordic . castUp
+  sin  = castDown . snd                . cordic . castUp
+  cos  = castDown . fst                . cordic . castUp
+  tan  = castDown . uncurry (flip (/)) . cordic . castUp
 
-  asin = notyet "asin"
-  acos = notyet "acos"
-  atan = notyet "atan"
+  asin = castRounding . arcsin
+  acos = castRounding . arccos
+  atan = castRounding . arctan
 
   -- sinh x = let ex = exp x in (ex^2 - 1) / (2 * ex)
-  sinh x = castRounding . castDown . evalOp' $
+  sinh x = castDown . evalOp' $
     Op.exp x >>= \ex -> two `Op.multiply` ex >>= \tex ->
     ex `Op.multiply` ex >>= (`Op.subtract` one) >>= (`Op.divide` tex)
   -- cosh x = let ex = exp x in (ex^2 + 1) / (2 * ex)
-  cosh x = castRounding . castDown . evalOp' $
+  cosh x = castDown . evalOp' $
     Op.exp x >>= \ex -> two `Op.multiply` ex >>= \tex ->
     ex `Op.multiply` ex >>= (`Op.add` one) >>= (`Op.divide` tex)
   -- tanh x = let e2x = exp (2 * x) in (e2x - 1) / (e2x + 1)
-  tanh x = castRounding . castDown . evalOp' $
+  tanh x = castDown . evalOp' $
     two `Op.multiply` x >>= Op.exp >>= \e2x ->
     e2x `Op.subtract` one >>= \e2xm1 -> e2x `Op.add` one >>= (e2xm1 `Op.divide`)
 
   -- asinh x = log (x + sqrt (x^2 + 1))
-  asinh x = castRounding . castDown . evalOp' $ x `Op.multiply` x >>=
+  asinh x = castDown . evalOp' $ x `Op.multiply` x >>=
     (`Op.add` one) >>= Op.squareRoot >>= (x `Op.add`) >>= Op.ln
   -- acosh x = log (x + sqrt (x^2 - 1))
-  acosh x = castRounding . castDown . evalOp' $ x `Op.multiply` x >>=
+  acosh x = castDown . evalOp' $ x `Op.multiply` x >>=
     (`Op.subtract` one) >>= Op.squareRoot >>= (x `Op.add`) >>= Op.ln
   -- atanh x = log ((1 + x) / (1 - x)) / 2
-  atanh x = castRounding . castDown . evalOp' $ one `Op.add` x >>= \xp1 ->
+  atanh x = castDown . evalOp' $ one `Op.add` x >>= \xp1 ->
     one `Op.subtract` x >>= (xp1 `Op.divide`) >>= Op.ln >>= Op.multiply oneHalf
 
 instance (FinitePrecision p, Rounding r) => RealFloat (Decimal p r) where
@@ -516,6 +599,10 @@ zero = Num { sign        = Pos
 -- | A 'Decimal' representing the value ½
 oneHalf :: Decimal p r
 oneHalf = zero { coefficient = 5, exponent = -1 }
+
+-- | A 'Decimal' representing the value ¼
+oneQuarter :: Decimal p r
+oneQuarter = zero { coefficient = 25, exponent = -2 }
 
 -- | A 'Decimal' representing the value one
 one :: Decimal p r

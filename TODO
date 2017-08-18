@@ -1,5 +1,4 @@
 -*- Outline -*-
 
 * To Do
-** instance Floating (Decimal p r)
 ** instance PrintfArg (Decimal p r)
