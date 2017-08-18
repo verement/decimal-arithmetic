@@ -16,7 +16,7 @@ bug-reports:         https://github.com/verement/decimal-arithmetic/issues
 license:             BSD3
 license-file:        LICENSE
 
-copyright:           © 2016 Robert Leslie
+copyright:           © 2016–2017 Robert Leslie
 author:              Rob Leslie <rob@mars.org>
 maintainer:          Rob Leslie <rob@mars.org>
 

@@ -1,7 +1,7 @@
 {-|
 Module      : Numeric.Decimal
 Description : General arbitrary-precision decimal floating-point number type
-Copyright   : © 2016 Robert Leslie
+Copyright   : © 2016–2017 Robert Leslie
 License     : BSD3
 Maintainer  : rob@mars.org
 Stability   : experimental
