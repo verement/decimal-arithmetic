@@ -460,7 +460,7 @@ log10 x = coerce <$> generalRules1 x
 -- Otherwise, if the divisor is zero then either the Division undefined
 -- condition is raised (if the dividend is zero) and the result is NaN, or the
 -- Division by zero condition is raised and the result is an Infinity with a
--- sign which is the exclusive or of the signs of the operands.
+-- sign which is the /exclusive or/ of the signs of the operands.
 --
 -- Otherwise, a “long division” is effected.
 --
