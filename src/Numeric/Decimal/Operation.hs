@@ -180,11 +180,11 @@ add Num { sign = xs, coefficient = xc, exponent = xe }
                    | otherwise = (xc, yc * 10^n)
           where n = Prelude.abs (xe - ye)
 
+add inf@Inf{} Num{} = return (coerce inf)
+add Num{} inf@Inf{} = return (coerce inf)
 add inf@Inf { sign = xs } Inf { sign = ys }
   | xs == ys  = return (coerce inf)
   | otherwise = invalidOperation qNaN
-add inf@Inf{} Num{} = return (coerce inf)
-add Num{} inf@Inf{} = return (coerce inf)
 add x y = generalRules2 x y
 
 -- | 'subtract' takes two operands. If either operand is a /special value/
@@ -197,7 +197,11 @@ add x y = generalRules2 x y
 -- from the most significant digit of the result.
 subtract :: (Precision p, Rounding r)
          => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-subtract x = add x . flipSign
+subtract x@Num{} y@Num{} = add x (flipSign y)
+subtract x@Inf{} y@Num{} = add x (flipSign y)
+subtract x@Num{} y@Inf{} = add x (flipSign y)
+subtract x@Inf{} y@Inf{} = add x (flipSign y)
+subtract x y = generalRules2 x y
 
 -- | 'minus' takes one operand, and corresponds to the prefix minus operator
 -- in programming languages.
