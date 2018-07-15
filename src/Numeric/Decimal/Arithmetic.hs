@@ -223,9 +223,11 @@ instance Show Signals where
   showsPrec d sigs = showParen (d > 10) $
     showString "signals " . showsPrec 11 (signalList sigs)
 
+instance Semigroup Signals where
+  Signals x <> Signals y = Signals (x .|. y)
+
 instance Monoid Signals where
   mempty = Signals zeroBits
-  Signals x `mappend` Signals y = Signals (x .|. y)
 
 -- | Create a set of signals from a singleton.
 signal :: Signal -> Signals
