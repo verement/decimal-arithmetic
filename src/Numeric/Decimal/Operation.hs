@@ -708,7 +708,7 @@ power x@Num { coefficient = 0 } y@Num{}
 power x@Num{} y@Num{} = case integralValue y of
   Just i  | i < 0               -> reciprocal x >>= \rx -> integralPower rx (-i)
           | otherwise           ->                         integralPower  x   i
-  Nothing | Number.isPositive x -> ln x >>= multiply y >>= fmap coerce . exp
+  Nothing | Number.isPositive x -> inexactPower x y
           | otherwise           -> invalidOperation qNaN
 power x@Num{} y@Inf{}
   | Number.isPositive x = return $ case sign y of
@@ -741,6 +741,15 @@ integralPower b e = integralPower' (return b) e one
                         integralPower'              (multiply b b) e'
           | otherwise = integralPower' (mb >>= \b -> multiply b b) e' r
           where e' = e `div` 2
+
+inexactPower :: (FinitePrecision p, Rounding r)
+             => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+inexactPower b e =
+  subArith (ln b >>= multiply e >>= exp) >>= subRounded >>= inexact
+  where subRounded :: (Precision p, Rounding r)
+                   => Decimal (PPlus1 (PPlus1 p)) a
+                   -> Arith p r (Decimal p r)
+        subRounded = roundDecimal
 
 -- | 'quantize' takes two operands. If either operand is a /special value/
 -- then the general rules apply, except that if either operand is infinite and
