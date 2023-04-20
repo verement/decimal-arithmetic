@@ -57,9 +57,9 @@ module Numeric.Decimal
 
          -- ** Number types with defined encodings
          -- $encodings
-       , Decimal32
-       , Decimal64
-       , Decimal128
+       -- , Decimal32
+       -- , Decimal64
+       -- , Decimal128
 
          -- ** Precision types
        , Precision
@@ -77,9 +77,9 @@ module Numeric.Decimal
 
        , PInfinite
 
-       , Pdecimal32
-       , Pdecimal64
-       , Pdecimal128
+       -- , Pdecimal32
+       -- , Pdecimal64
+       -- , Pdecimal128
 
          -- ** Rounding types
        , Rounding
@@ -99,7 +99,6 @@ module Numeric.Decimal
        , fromOrdering
        ) where
 
-import Numeric.Decimal.Encoding
 import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
 import Numeric.Decimal.Rounding
