@@ -1,6 +1,6 @@
 
 name:                decimal-arithmetic
-version:             0.5.1.0
+version:             0.5.1.1
 
 synopsis:            An implementation of the General Decimal Arithmetic
                      Specification
@@ -41,8 +41,8 @@ library
                        Numeric.Decimal.Arithmetic
                        Numeric.Decimal.Conversion
                        Numeric.Decimal.Operation
-  other-modules:       Numeric.Decimal.Exception
                        Numeric.Decimal.Number
+  other-modules:       Numeric.Decimal.Exception
                        Numeric.Decimal.Precision
                        Numeric.Decimal.Rounding
 
