@@ -42,7 +42,7 @@ library
                        Numeric.Decimal.Conversion
                        Numeric.Decimal.Operation
                        Numeric.Decimal.Number
-  other-modules:       Numeric.Decimal.Exception
+                       Numeric.Decimal.Exception
                        Numeric.Decimal.Precision
                        Numeric.Decimal.Rounding
 

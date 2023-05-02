@@ -147,6 +147,8 @@ generalRules2 nan@NaN{} _                    = return (coerce nan)
 generalRules2 _         nan@NaN{}            = return (coerce nan)
 generalRules2 x         _                    = invalidOperation x
 
+
+
 -- $arithmetic-operations
 --
 -- This section describes the arithmetic operations on, and some other
@@ -160,9 +162,15 @@ generalRules2 x         _                    = invalidOperation x
 --
 -- The result is then rounded to /precision/ digits if necessary, counting
 -- from the most significant digit of the result.
+
 add :: (Precision p, Rounding r)
     => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-add Num { sign = xs, coefficient = xc, exponent = xe }
+add a b = chargeArithOp (GasArithOp ArithAdd a b) *> add' a b
+
+
+add' :: (Precision p, Rounding r)
+    => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+add' Num { sign = xs, coefficient = xc, exponent = xe }
     Num { sign = ys, coefficient = yc, exponent = ye } = sum
 
   where sum = result Num { sign = rs, coefficient = rc, exponent = re }
@@ -180,12 +188,12 @@ add Num { sign = xs, coefficient = xc, exponent = xe }
                    | otherwise = (xc, yc * 10^n)
           where n = Prelude.abs (xe - ye)
 
-add inf@Inf{} Num{} = return (coerce inf)
-add Num{} inf@Inf{} = return (coerce inf)
-add inf@Inf { sign = xs } Inf { sign = ys }
+add' inf@Inf{} Num{} = return (coerce inf)
+add' Num{} inf@Inf{} = return (coerce inf)
+add' inf@Inf { sign = xs } Inf { sign = ys }
   | xs == ys  = return (coerce inf)
   | otherwise = invalidOperation qNaN
-add x y = generalRules2 x y
+add' x y = generalRules2 x y
 
 -- | 'subtract' takes two operands. If either operand is a /special value/
 -- then the general rules apply.
@@ -220,6 +228,11 @@ minus x = zero { exponent = exponent x } `subtract` x
 plus :: (Precision p, Rounding r) => Decimal a b -> Arith p r (Decimal p r)
 plus x = zero { exponent = exponent x } `add` x
 
+
+multiply :: (Precision p, Rounding r)
+         => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+multiply a b = chargeArithOp (GasArithOp ArithMult a b) *> multiply' a b
+
 -- | 'multiply' takes two operands. If either operand is a /special value/
 -- then the general rules apply. Otherwise, the operands are multiplied
 -- together (“long multiplication”), resulting in a number which may be as
@@ -227,9 +240,9 @@ plus x = zero { exponent = exponent x } `add` x
 --
 -- The result is then rounded to /precision/ digits if necessary, counting
 -- from the most significant digit of the result.
-multiply :: (Precision p, Rounding r)
+multiply' :: (Precision p, Rounding r)
          => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-multiply Num { sign = xs, coefficient = xc, exponent = xe }
+multiply' Num { sign = xs, coefficient = xc, exponent = xe }
          Num { sign = ys, coefficient = yc, exponent = ye } = result rn
 
   where rn = Num { sign = rs, coefficient = rc, exponent = re }
@@ -237,15 +250,15 @@ multiply Num { sign = xs, coefficient = xc, exponent = xe }
         rc = xc * yc
         re = xe + ye
 
-multiply Inf { sign = xs } Inf { sign = ys } =
+multiply' Inf { sign = xs } Inf { sign = ys } =
   return Inf { sign = xorSigns xs ys }
-multiply Inf { sign = xs } Num { sign = ys, coefficient = yc }
+multiply' Inf { sign = xs } Num { sign = ys, coefficient = yc }
   | yc == 0   = invalidOperation qNaN
   | otherwise = return Inf { sign = xorSigns xs ys }
-multiply Num { sign = xs, coefficient = xc } Inf { sign = ys }
+multiply' Num { sign = xs, coefficient = xc } Inf { sign = ys }
   | xc == 0   = invalidOperation qNaN
   | otherwise = return Inf { sign = xorSigns xs ys }
-multiply x y = generalRules2 x y
+multiply' x y = generalRules2 x y
 
 -- | 'exp' takes one operand. If the operand is a NaN then the general rules
 -- for special values apply.
@@ -454,6 +467,11 @@ log10 x@Num { sign = s, coefficient = c, exponent = e }
 log10 n@Inf { sign = Pos } = return (coerce n)
 log10 x = coerce <$> generalRules1 x
 
+
+divide :: (FinitePrecision p, Rounding r)
+       => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
+divide a b = chargeArithOp (GasArithOp ArithDiv a b) *> divide' a b
+
 -- | 'divide' takes two operands. If either operand is a /special value/ then
 -- the general rules apply.
 --
@@ -467,12 +485,12 @@ log10 x = coerce <$> generalRules1 x
 -- The result is then rounded to /precision/ digits, if necessary, according
 -- to the /rounding/ algorithm and taking into account the remainder from the
 -- division.
-divide :: (FinitePrecision p, Rounding r)
+divide' :: (FinitePrecision p, Rounding r)
        => Decimal a b -> Decimal c d -> Arith p r (Decimal p r)
-divide dividend@Num{ sign = xs } Num { coefficient = 0, sign = ys }
+divide' dividend@Num{ sign = xs } Num { coefficient = 0, sign = ys }
   | Number.isZero dividend = divisionUndefined
   | otherwise              = divisionByZero infinity { sign = xorSigns xs ys }
-divide Num { sign = xs, coefficient = xc, exponent = xe }
+divide' Num { sign = xs, coefficient = xc, exponent = xe }
        Num { sign = ys, coefficient = yc, exponent = ye } = quotient
 
   where quotient = result =<< answer
@@ -487,12 +505,12 @@ divide Num { sign = xs, coefficient = xc, exponent = xe }
               EQ -> rn { coefficient = rc * 10 + 5, exponent = re - 1 }
               GT -> rn { coefficient = rc * 10 + 9, exponent = re - 1 }
 
-divide Inf{} Inf{} = invalidOperation qNaN
-divide Inf { sign = xs } Num { sign = ys } =
+divide' Inf{} Inf{} = invalidOperation qNaN
+divide' Inf { sign = xs } Num { sign = ys } =
   return Inf { sign = xorSigns xs ys }
-divide Num { sign = xs } Inf { sign = ys } =
+divide' Num { sign = xs } Inf { sign = ys } =
   return zero { sign = xorSigns xs ys }
-divide x y = generalRules2 x y
+divide' x y = generalRules2 x y
 
 type Dividend  = Coefficient
 type Divisor   = Coefficient

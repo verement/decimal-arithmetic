@@ -1,5 +1,5 @@
 
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, NumericUnderscores #-}
 
 -- | It is not usually necessary to import this module unless you want to use
 -- the arithmetic operations from "Numeric.Decimal.Operation" or you need
@@ -44,20 +44,26 @@ module Numeric.Decimal.Arithmetic
        , signalMember
 
        , raiseSignal
+       , chargeArithOp
        , clearFlags
 
          -- ** Traps
        , TrapHandler
        , trap
+      
+       , ArithBasicOp(..)
+       , GasArithOp(..)
        ) where
 
+import Control.Monad(when)
 import Control.Monad.Except (MonadError(throwError, catchError),
                              ExceptT, runExceptT)
-import Control.Monad.State (MonadState(get, put), modify, gets,
-                            State, runState, evalState)
+import Control.Monad.State.Strict (MonadState(get, put), gets,
+                            State, runState, evalState, modify')
 import Data.Bits (zeroBits, bit, complement, testBit, (.&.), (.|.))
 import Data.Coerce (coerce)
 import Data.Monoid ((<>))
+import Data.Word(Word64)
 
 import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
@@ -75,15 +81,31 @@ import Numeric.Decimal.Rounding
 -- @r@
 data Context p r =
   Context { flags        :: Signals
-                            -- ^ The current signal flags of the context
+          -- ^ The current signal flags of the context
           , trapHandler  :: TrapHandler p r
-                            -- ^ The trap handler function for the context
+          -- ^ The trap handler function for the context
+          , ctxGas :: !Word64
+        -- ^ The context gas.  
+          , ctxGasLimit :: Word64
+          -- ^ The context gas limit
           }
+
+data ArithBasicOp
+  = ArithAdd
+  | ArithMult
+  | ArithDiv
+  deriving (Eq, Show, Ord)
+
+data GasArithOp a b c d
+  = GasArithOp ArithBasicOp (Decimal a b) (Decimal c d)
+  deriving Show
 
 -- | Return a new context with all signal flags cleared and all traps disabled.
 newContext :: Context p r
 newContext = Context { flags       = mempty
                      , trapHandler = return . exceptionResult
+                     , ctxGas = 0
+                     , ctxGasLimit = 10_000_000
                      }
 
 -- $default-contexts
@@ -123,7 +145,7 @@ data Exception p r =
 
 -- | A decimal arithmetic monad parameterized by the precision @p@ and
 -- rounding mode @r@
-newtype Arith p r a = Arith (ExceptT (Exception p r)
+newtype   Arith p r a = Arith (ExceptT (Exception p r)
                              (State (Context p r)) a)
 
 instance Functor (Arith p r) where
@@ -168,10 +190,16 @@ evalArith (Arith e) = evalState (runExceptT e)
 -- subcomputation are ignored, but if an exception is returned it will be
 -- re-raised within the current context.
 subArith :: Arith a b (Decimal a b) -> Arith p r (Decimal a b)
-subArith arith = case evalArith arith newContext of
-  Left e  -> let result = coerce (exceptionResult e)
-             in coerce <$> raiseSignal (exceptionSignal e) result
-  Right r -> return r
+subArith arith = do
+  gas <- gets ctxGas
+  gasLimit <- gets ctxGasLimit
+  let (g, ctx) = runArith arith newContext{ctxGas=gas, ctxGasLimit=gasLimit}
+  modify' (\ctx' -> ctx'{ctxGas=ctxGas ctx})
+  case g of
+    Left e  -> do
+      let result = coerce (exceptionResult e)
+      coerce <$> raiseSignal (exceptionSignal e) result
+    Right r -> return r
 
 -- | Return the precision of the arithmetic context (or 'Nothing' if the
 -- precision is infinite).
@@ -213,6 +241,8 @@ data Signal
     -- E/min/), before any rounding
   | Underflow
     -- ^ Raised when a result is both subnormal and inexact
+  | GasExceeded
+    -- ^ Raised when an operation exceeds the gas bound
   deriving (Eq, Enum, Bounded, Show)
 
 -- | A group of signals can be manipulated as a set.
@@ -253,6 +283,21 @@ unsignal (Signals u) (Signals ss) = Signals (ss .&. complement u)
 signalMember :: Signal -> Signals -> Bool
 signalMember sig (Signals ss) = testBit ss (fromEnum sig)
 
+chargeArithOp :: GasArithOp a b c d -> Arith p r ()
+chargeArithOp (GasArithOp gt a b) =
+  case gt of
+    ArithAdd -> chargeGas 1
+    ArithMult -> chargeGas 1
+    ArithDiv -> chargeGas 1
+
+chargeGas :: Word64 -> Arith p r ()
+chargeGas g = do
+  gCurr <- gets ctxGas
+  gLim <- gets ctxGasLimit
+  let gNew = gCurr + g
+  when (gNew > gLim) $ throwError (Exception GasExceeded qNaN)
+  modify' (\st -> st{ctxGas=gNew})
+
 -- | Set the given signal flag in the context of the current arithmetic
 -- computation, and call the trap handler if the trap for this signal is
 -- currently enabled.
@@ -266,7 +311,7 @@ raiseSignal sig n = do
 -- | Clear the given signal flags from the context of the current arithmetic
 -- computation.
 clearFlags :: Signals -> Arith p r ()
-clearFlags sigs = modify $ \ctx -> ctx { flags = unsignal sigs (flags ctx) }
+clearFlags sigs = modify' $ \ctx -> ctx { flags = unsignal sigs (flags ctx) }
 
 -- | A trap handler function may return a substitute result for the operation
 -- that caused the exceptional condition, or it may call 'throwError' to pass
@@ -301,4 +346,4 @@ trap sigs handler arith = do
           return r
 
         setHandler :: TrapHandler p r -> Arith p r ()
-        setHandler handler = modify $ \ctx -> ctx { trapHandler = handler }
+        setHandler handler = modify' $ \ctx -> ctx { trapHandler = handler }

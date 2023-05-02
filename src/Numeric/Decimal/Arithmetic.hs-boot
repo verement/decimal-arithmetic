@@ -13,7 +13,7 @@ module Numeric.Decimal.Arithmetic
        ) where
 
 import Control.Monad.Except (ExceptT)
-import Control.Monad.State (State)
+import Control.Monad.State.Strict (State)
 
 import {-# SOURCE #-} Numeric.Decimal.Number
 import                Numeric.Decimal.Precision (Precision)
@@ -37,6 +37,7 @@ data Signal
   | Rounded
   | Subnormal
   | Underflow
+  | GasExceeded
 raiseSignal :: Signal -> Decimal p r -> Arith p r (Decimal p r)
 
 type role Exception phantom phantom
