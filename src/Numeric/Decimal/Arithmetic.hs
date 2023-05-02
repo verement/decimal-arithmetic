@@ -14,6 +14,8 @@ module Numeric.Decimal.Arithmetic
          Context
        , newContext
        , flags
+       , ctxGas
+       , ctxGasLimit
        , getPrecision
        , getRounding
        , RoundingAlgorithm(..)
