@@ -30,10 +30,6 @@ extra-source-files:  README.md
                      TODO
                      stack.yaml
 
-flag with-integer-gmp
-  description: Include integer-gmp package (removed after GHC 9)
-  manual:      False
-
 source-repository head
   type:                git
   location:            https://github.com/verement/decimal-arithmetic.git
@@ -49,14 +45,8 @@ library
                        Numeric.Decimal.Exception
                        Numeric.Decimal.Precision
                        Numeric.Decimal.Rounding
-  if flag(with-integer-gmp)
-    build-depends:
-        , base >=4.15.0.0
-  else
-    build-depends:
-      , base >=4.11 && < 4.15.0.0
-      , integer-gmp
-  build-depends:      
+  build-depends:     
+                     , base >= 4.11
                      , binary >= 0.8
                      , deepseq >= 1.4
                      , mtl >= 2.2

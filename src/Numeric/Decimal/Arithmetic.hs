@@ -71,7 +71,6 @@ import Data.Coerce (coerce)
 import Data.Monoid ((<>))
 import Data.Word(Word64)
 import GHC.Int(Int(..))
-import qualified GHC.Integer.Logarithms as IntLog
 
 import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
@@ -115,7 +114,7 @@ newContext = Context { flags       = mempty
                      , trapHandler = return . exceptionResult
                      , ctxGas = 0
                      , ctxGasLimit = 10_000_000
-                     , ctxChargeGas = chargeArithOp
+                     , ctxChargeGas = const (pure ())
                      }
 
 -- $default-contexts
