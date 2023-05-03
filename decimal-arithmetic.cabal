@@ -1,3 +1,4 @@
+cabal-version:       2.2
 
 name:                decimal-arithmetic
 version:             0.5.1.1
@@ -13,7 +14,7 @@ description:         This package provides an implementation of the General
 homepage:            https://github.com/verement/decimal-arithmetic#readme
 bug-reports:         https://github.com/verement/decimal-arithmetic/issues
 
-license:             BSD3
+license:             BSD-3-Clause
 license-file:        LICENSE
 
 copyright:           © 2016–2017 Robert Leslie
@@ -24,11 +25,14 @@ stability:           experimental
 category:            Numeric
 
 build-type:          Simple
-cabal-version:       >=1.10
 
 extra-source-files:  README.md
                      TODO
                      stack.yaml
+
+flag with-integer-gmp
+  description: Include integer-gmp package (removed after GHC 9)
+  manual:      False
 
 source-repository head
   type:                git
@@ -45,8 +49,14 @@ library
                        Numeric.Decimal.Exception
                        Numeric.Decimal.Precision
                        Numeric.Decimal.Rounding
-
-  build-depends:       base >= 4.11
+  if flag(with-integer-gmp)
+    build-depends:
+        , base >=4.15.0.0
+  else
+    build-depends:
+      , base >=4.11 && < 4.15.0.0
+      , integer-gmp
+  build-depends:      
                      , binary >= 0.8
                      , deepseq >= 1.4
                      , mtl >= 2.2
@@ -63,6 +73,7 @@ test-suite spec
   other-modules:       Arbitrary
                        Numeric.Decimal.NumberSpec
                        Numeric.Decimal.OperationSpec
+                       
   build-depends:       base
                      , binary
                      , decimal-arithmetic

@@ -1,5 +1,8 @@
 
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, NumericUnderscores #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, NumericUnderscores, BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE RankNTypes #-}
+
 
 -- | It is not usually necessary to import this module unless you want to use
 -- the arithmetic operations from "Numeric.Decimal.Operation" or you need
@@ -16,6 +19,7 @@ module Numeric.Decimal.Arithmetic
        , flags
        , ctxGas
        , ctxGasLimit
+       , ctxChargeGas
        , getPrecision
        , getRounding
        , RoundingAlgorithm(..)
@@ -66,6 +70,8 @@ import Data.Bits (zeroBits, bit, complement, testBit, (.&.), (.|.))
 import Data.Coerce (coerce)
 import Data.Monoid ((<>))
 import Data.Word(Word64)
+import GHC.Int(Int(..))
+import qualified GHC.Integer.Logarithms as IntLog
 
 import Numeric.Decimal.Number
 import Numeric.Decimal.Precision
@@ -90,6 +96,7 @@ data Context p r =
         -- ^ The context gas.  
           , ctxGasLimit :: Word64
           -- ^ The context gas limit
+          , ctxChargeGas :: forall a b c d. GasArithOp a b c d -> Arith p r ()
           }
 
 data ArithBasicOp
@@ -108,6 +115,7 @@ newContext = Context { flags       = mempty
                      , trapHandler = return . exceptionResult
                      , ctxGas = 0
                      , ctxGasLimit = 10_000_000
+                     , ctxChargeGas = chargeArithOp
                      }
 
 -- $default-contexts
@@ -147,7 +155,7 @@ data Exception p r =
 
 -- | A decimal arithmetic monad parameterized by the precision @p@ and
 -- rounding mode @r@
-newtype   Arith p r a = Arith (ExceptT (Exception p r)
+newtype Arith p r a = Arith (ExceptT (Exception p r)
                              (State (Context p r)) a)
 
 instance Functor (Arith p r) where
@@ -288,12 +296,12 @@ signalMember sig (Signals ss) = testBit ss (fromEnum sig)
 chargeArithOp :: GasArithOp a b c d -> Arith p r ()
 chargeArithOp (GasArithOp gt a b) =
   case gt of
-    ArithAdd -> chargeGas 1
-    ArithMult -> chargeGas 1
-    ArithDiv -> chargeGas 1
+    ArithAdd -> chargeArithGas 1
+    ArithMult -> chargeArithGas 1
+    ArithDiv -> chargeArithGas 1
 
-chargeGas :: Word64 -> Arith p r ()
-chargeGas g = do
+chargeArithGas :: Word64 -> Arith p r ()
+chargeArithGas g = do
   gCurr <- gets ctxGas
   gLim <- gets ctxGasLimit
   let gNew = gCurr + g
